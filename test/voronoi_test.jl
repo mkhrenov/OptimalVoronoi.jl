@@ -1,29 +1,22 @@
-using Delaunay
 using WeightedCVT
-using BenchmarkTools
-using Profile
-using StaticArrays
-using GeometryBasics
 using GLMakie
+using BenchmarkTools
 
+nx = ny = nz = 100
 
-points = rand(20, WeightedCVT.DIM)
+domain = ones(Int, nx, ny, nz)
+for index in CartesianIndices(domain)
+    dist_to_c = (index[1] - nx ÷ 2)^2 + (index[2] - ny ÷ 2)^2 + (index[3] - nz ÷ 2)^2
+    if dist_to_c > 50^2
+        domain[index] = 0
+    end
+end
+min_dist = zeros(size(domain))
 
-tri = delaunay(points)
-voronoi = WeightedCVT.delaunay_to_voronoi(tri)
+points = rand(1:ny, 3, 10)
 
-tri_point_pairs = [
-    (tri.simplices[i,j], tri.simplices[i,k])
-    for i in 1:size(tri.simplices, 1)
-    for j in 1:size(tri.simplices, 2)
-    for k in (j+1):size(tri.simplices, 2)
-]
+WeightedCVT.voronoi!(domain, min_dist, points)
 
-tetras = [GeometryBasics.TetrahedronFace(tri.simplices[i, :]...) for i in 1:size(tri.simplices, 1)]
-points = Makie.to_vertices(tri.points) # Use Makie to convert to Vector{Point3f}
-m = GeometryBasics.Mesh(points, tetras) # create tetrahedra mesh
-# Triangulate it, since Makie's mesh conversion currently doesn't handle tetrahedras itself 
-
-# scatter(tri.points[:, 1], tri.points[:, 2], tri.points[:, 3], label = "Delaunay Points")
-# plot([(tri.points[i,:], tri.points[j,:]) for (i,j) in tri_point_pairs])
-# scatter!(voronoi.vertices[:, 1], voronoi.vertices[:, 2], voronoi.vertices[:, 3], label = "Voronoi Cell Vertices")
+fig = volume(domain)#, aspect_ratio = :equal)
+scatter!(points, label = nothing)
+display(fig)
