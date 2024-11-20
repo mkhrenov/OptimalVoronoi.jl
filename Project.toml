@@ -1,0 +1,20 @@
+name = "WeightedCVT"
+uuid = "770ca0ce-b1ea-490c-93de-6aee52022c72"
+authors = ["Mikhail Khrenov <mkhrenov34@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+Delaunay = "07eb4e4e-0c6d-46ef-bc4e-83d5e5d860a9"
+GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
+GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Profile = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
+[compat]
+Delaunay = "1.2.0"
+GLMakie = "0.10.16"
+GeometryBasics = "0.4.11"
+LinearAlgebra = "1.11.0"
+Profile = "1.11.0"
+StaticArrays = "1.9.8"
