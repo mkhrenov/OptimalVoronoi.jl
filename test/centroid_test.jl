@@ -1,8 +1,10 @@
 using WeightedCVT
 using GLMakie
 using BenchmarkTools
+using Profile
 
 nx = ny = nz = 100
+N = 10
 
 domain = ones(Int, nx, ny, nz)
 for index in CartesianIndices(domain)
@@ -13,10 +15,13 @@ for index in CartesianIndices(domain)
 end
 min_dist = zeros(size(domain))
 
-points = rand(1:ny, 3, 10)
+points = Float64.(rand(1:ny, 3, N))
 
 WeightedCVT.voronoi!(domain, min_dist, points)
 
 fig = volume(domain)#, aspect_ratio = :equal)
-scatter!(points, label = nothing)
+scatter!(points, color=:blue)
+
+WeightedCVT.get_centroids!(domain, points, N)
+scatter!(points, color=:red)
 display(fig)
