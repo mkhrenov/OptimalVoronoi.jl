@@ -17,6 +17,6 @@ points = rand(1:ny, 3, 10)
 
 WeightedCVT.voronoi!(domain, min_dist, points)
 
-fig = volume(domain)#, aspect_ratio = :equal)
+fig = volume(domain)
 scatter!(points, label = nothing)
 display(fig)

@@ -18,6 +18,6 @@ min_dist = zeros(size(domain))
 points = Float64.(rand(1:ny, 3, N))
 points = WeightedCVT.centroidal_voronoi(domain, points)
 
-fig = volume(domain)#, aspect_ratio = :equal)
+fig = volume(domain)
 scatter!(points, color=:red)
 display(fig)

@@ -19,7 +19,7 @@ points = Float64.(rand(1:ny, 3, N))
 
 WeightedCVT.voronoi!(domain, min_dist, points)
 
-fig = volume(domain)#, aspect_ratio = :equal)
+fig = volume(domain)
 scatter!(points, color=:blue)
 
 WeightedCVT.get_centroids!(domain, points, N)
