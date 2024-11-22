@@ -29,7 +29,7 @@ min_dist = zeros(size(domain))
 init_points = Float64.(rand(1:ny, 3, N))
 points = WeightedCVT.centroidal_voronoi(domain, init_points, T)
 
-volumes, adjacency, separations, interfaces, meshes = WeightedCVT.structure(domain, points)
+volumes, adjacency, separations, interfaces, air_area, base_area, meshes = WeightedCVT.structure(domain, points)
 
 meshes = [mesh for mesh in meshes if !isempty(mesh)]
 fig = GLMakie.mesh(meshes[1])
