@@ -1,10 +1,9 @@
 using WeightedCVT
 using GLMakie
 using BenchmarkTools
-using Profile
+using CUDA
 
 nx = ny = nz = 100
-N = 10
 
 domain = ones(Int, nx, ny, nz)
 for index in CartesianIndices(domain)
@@ -14,13 +13,13 @@ for index in CartesianIndices(domain)
     end
 end
 
-points = Float64.(rand(1:ny, 3, N))
+points = rand(1:ny, 3, 10)
+
+domain = cu(domain)
+points = cu(points)
 
 WeightedCVT.voronoi!(domain, points)
 
 fig = volume(domain)
-scatter!(points, color=:blue)
-
-WeightedCVT.get_centroids!(domain, points)
-scatter!(points, color=:red)
+scatter!(points, label=nothing)
 display(fig)
