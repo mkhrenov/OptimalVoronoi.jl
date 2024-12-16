@@ -24,11 +24,10 @@ for index in CartesianIndices(domain)
         domain[index] = 0
     end
 end
-min_dist = zeros(size(domain))
 
 init_points = Float64.(rand(1:ny, 3, N))
 points = WeightedCVT.centroidal_voronoi(domain, init_points, T)
 
 fig = volume(domain)
-scatter!(points, color = :red)
+scatter!(points, color=:red)
 display(fig)

@@ -11,12 +11,11 @@ for index in CartesianIndices(domain)
         domain[index] = 0
     end
 end
-min_dist = zeros(size(domain))
 
 points = rand(1:ny, 3, 10)
 
-WeightedCVT.voronoi!(domain, min_dist, points)
+WeightedCVT.voronoi!(domain, points)
 
 fig = volume(domain)
-scatter!(points, label = nothing)
+scatter!(points, label=nothing)
 display(fig)

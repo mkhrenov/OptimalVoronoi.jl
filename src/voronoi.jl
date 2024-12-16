@@ -5,23 +5,22 @@
 
     Points in domain with value 0 are treated as out of bounds and will remain 0.
 """
-function voronoi!(domain::AbstractArray, min_dist::AbstractArray, points::AbstractMatrix)
+function voronoi!(domain::AbstractArray, points::AbstractMatrix)
     dims = size(domain)
     indices = CartesianIndices(domain)
     D = size(points, 1)
     N = size(points, 2)
 
-
-    min_dist .= typemax(Float64)
-
     for index in indices
+
+        min_dist = typemax(Float64)
         for p in 1:N
             # Don't bother evaluating if the cell is out of bounds
             if domain[index] == 0
                 continue
             end
 
-            old_dist = min_dist[index]
+            old_dist = min_dist
             new_dist = 0.0
 
             # Compute squared distance to point p
@@ -31,7 +30,7 @@ function voronoi!(domain::AbstractArray, min_dist::AbstractArray, points::Abstra
 
             # Update if closer distance discovered
             if new_dist < old_dist
-                min_dist[index] = new_dist
+                min_dist = new_dist
                 domain[index] = p
             end
         end
