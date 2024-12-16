@@ -16,11 +16,23 @@ end
 
 points = Float64.(rand(1:ny, 3, N))
 
+domain = cu(domain)
+points = cu(points)
+
 WeightedCVT.voronoi!(domain, points)
+
+domain = Array(domain)
+points = Array(points)
 
 fig = volume(domain)
 scatter!(points, color=:blue)
 
+domain = cu(domain)
+points = cu(points)
+
 WeightedCVT.get_centroids!(domain, points)
+
+points = Array(points)
+
 scatter!(points, color=:red)
 display(fig)
