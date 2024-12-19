@@ -26,9 +26,9 @@ domain = ones(Int, nx, ny, nz)
 # end
 
 init_points = Float64.(rand(1:ny, 3, N))
-points = WeightedCVT.centroidal_voronoi(domain, init_points, T)
+@time points = WeightedCVT.centroidal_voronoi(domain, init_points, T)
 
-volumes, adjacency, separations, interfaces, air_area, base_area, meshes = WeightedCVT.structure(domain, points)
+@time volumes, adjacency, separations, interfaces, air_area, base_area, meshes = WeightedCVT.structure(domain, points)
 
 meshes = [mesh for mesh in meshes if !isempty(mesh)]
 fig = GLMakie.mesh(meshes[1])

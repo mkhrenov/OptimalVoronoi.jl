@@ -36,7 +36,7 @@ CUDA.@time CUDA.@sync points = WeightedCVT.centroidal_voronoi(domain, init_point
 points = Array(points)
 domain = Array(domain)
 
-@time volumes, adjacency, separations, interfaces, air_area, base_area, meshes = WeightedCVT.structure(domain, points)
+@time volumes, adjacency, separations, interfaces, air_area, base_area, meshes = WeightedCVT.structure(domain, points);
 
 meshes = [mesh for mesh in meshes if !isempty(mesh)]
 fig = GLMakie.mesh(meshes[1])
