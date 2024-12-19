@@ -11,6 +11,6 @@ include("utils.jl")
 include("voronoi.jl")
 include("centroids.jl")
 include("lloyd.jl")
-include("relationships.jl")
+include("structure.jl")
 
 end # module WeightedCVT
