@@ -10,7 +10,6 @@ function centroidal_voronoi(domain, initial_points, f::F; max_iters=50, over_rel
 
         @. new_points = (new_points - old_points) * over_relax + old_points
         if mapreduce((x, y) -> (x - y)^2, +, new_points, old_points) / N < tol
-            println(i)
             break
         end
         old_points .= new_points
@@ -30,7 +29,6 @@ function centroidal_voronoi(domain, initial_points; max_iters=50, over_relax=1.5
 
         @. new_points = (new_points - old_points) * over_relax + old_points
         if mapreduce((x, y) -> (x - y)^2, +, new_points, old_points) / N < tol
-            println(i)
             break
         end
         old_points .= new_points
