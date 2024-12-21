@@ -34,12 +34,49 @@
 
 #     return Tetrahedron(a, b, c, d), Tetrahedron(b, c, d, e)
 # end
+function flip14(tet::DelaunayTet, p::Int)
+    a, b, c, d = tet.vertices
 
-# function flip14(tet1::Tetrahedron, p::Point)
-#     a, b, c, d = tet1.vertices
+    t1 = DelaunayTet(a, b, c, p)
+    t2 = DelaunayTet(a, b, d, p)
+    t3 = DelaunayTet(a, c, d, p)
+    t4 = DelaunayTet(b, d, c, p)
 
-#     return Tetrahedron(a, b, c, p), Tetrahedron(a, d, c, p), Tetrahedron(a, b, d, p), Tetrahedron(b, d, c, p)
-# end
+    if isassigned(tet.neighbors, 1)
+        replace_neighbor!(tet.neighbors[1], tet, t1)
+        t1.neighbors[1] = tet.neighbors[1]
+    end
+    if isassigned(tet.neighbors, 2)
+        replace_neighbor!(tet.neighbors[2], tet, t2)
+        t2.neighbors[2] = tet.neighbors[2]
+    end
+    if isassigned(tet.neighbors, 3)
+        replace_neighbor!(tet.neighbors[3], tet, t3)
+        t3.neighbors[3] = tet.neighbors[3]
+    end
+    if isassigned(tet.neighbors, 4)
+        replace_neighbor!(tet.neighbors[4], tet, t4)
+        t4.neighbors[4] = tet.neighbors[4]
+    end
+
+    t1.neighbors[2] = t2
+    t1.neighbors[3] = t3
+    t1.neighbors[4] = t4
+
+    t2.neighbors[1] = t1
+    t2.neighbors[3] = t3
+    t2.neighbors[4] = t4
+
+    t3.neighbors[1] = t1
+    t3.neighbors[2] = t2
+    t3.neighbors[4] = t4
+
+    t4.neighbors[1] = t1
+    t4.neighbors[2] = t2
+    t4.neighbors[3] = t3
+
+    return t1
+end
 
 # function flip41(tet1::Tetrahedron, tet2::Tetrahedron, tet3::Tetrahedron, tet4::Tetrahedron)
 #     a, b, c, e = tet1.vertices
