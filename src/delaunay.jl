@@ -5,12 +5,6 @@ using GLMakie
 
 ##### Data Structures #####
 
-struct Delaunay{PAT,SAT,DIM}
-    points::PAT
-    simplices::SAT
-    neighbors::SAT
-end
-
 struct DelaunaySimplex{DIM}
     vertices::NTuple{DIM,Int}
     neighbors::Vector{DelaunaySimplex{DIM}}
@@ -28,8 +22,17 @@ end
 
 const DelaunayTet = DelaunaySimplex{4}
 
-include("predicates.jl")
-include("flips.jl")
+Base.show(io::IO, s::DelaunaySimplex) = print(io, "$(s.vertices)")
+
+function simplex_is(s::DelaunaySimplex{DIM}, ps::Vararg{Int,DIM}) where {DIM}
+    for p in ps
+        if p ∉ s.vertices
+            return false
+        end
+    end
+
+    return true
+end
 
 function replace_neighbor!(simplex::DelaunaySimplex{DIM}, old_neighbor::DelaunaySimplex{DIM}, new_neighbor::DelaunaySimplex{DIM}) where {DIM}
     for i in 1:DIM
@@ -40,10 +43,13 @@ function replace_neighbor!(simplex::DelaunaySimplex{DIM}, old_neighbor::Delaunay
     end
 end
 
+include("predicates.jl")
+include("flips.jl")
+
+
 ##### Point Location #####
 
-function walk(points::PMT, σ::DelaunaySimplex{DIM}, p::Int) where {DIM,T<:Number,PMT<:AbstractMatrix{T}}
-
+function walk(σ::DelaunaySimplex{DIM}, p::Int, points) where {DIM}
     converged = false
     while !converged
         converged = true
@@ -65,33 +71,8 @@ function walk(points::PMT, σ::DelaunaySimplex{DIM}, p::Int) where {DIM,T<:Numbe
 end
 
 function closertothan(p::Int, n::Int, σ::DelaunayTet, points::PMT) where {T<:Number,PMT<:AbstractMatrix{T}}
-    v1 = 0
-    v2 = 0
-    v3 = 0
-    q = 0
-
     # Find the points that form the interface between n and σ, and the point `q` in σ which is opposite the interface
-    if n == 1
-        v1 = σ.vertices[1]
-        v2 = σ.vertices[3]
-        v3 = σ.vertices[2]
-        q = σ.vertices[4]
-    elseif n == 2
-        v1 = σ.vertices[1]
-        v2 = σ.vertices[3]
-        v3 = σ.vertices[2]
-        q = σ.vertices[4]
-    elseif n == 3
-        v1 = σ.vertices[1]
-        v2 = σ.vertices[3]
-        v3 = σ.vertices[2]
-        q = σ.vertices[4]
-    elseif n == 4
-        v1 = σ.vertices[1]
-        v2 = σ.vertices[3]
-        v3 = σ.vertices[2]
-        q = σ.vertices[4]
-    end
+    v1, v2, v3, q = get_commonface_and_opposite(σ, n)
 
     # Get the orientation of `q` wrt the interface
     oq = orient(@view(points[:, v1]), @view(points[:, v2]), @view(points[:, v3]), @view(points[:, q]))
@@ -103,23 +84,160 @@ function closertothan(p::Int, n::Int, σ::DelaunayTet, points::PMT) where {T<:Nu
     return oq * op < 0
 end
 
-##### Delaunay Triangulation #####
 
-function insert_one_point(DT::Delaunay, p::Int)
+##### Delaunay Tetrahedralization #####
 
+function insert_one_point(genesis::DelaunayTet, p::Int, points, stack::Stack{DelaunayTet})
+    τ = walk(genesis, p, points)
+    t1, t2, t3, t4 = flip14(τ, p, points)
+
+    deleted = Set{DelaunayTet}()
+    push!(stack, t1)
+    push!(stack, t2)
+    push!(stack, t3)
+    push!(stack, t4)
+
+    while !isempty(stack)
+        τ = pop!(stack)
+        τₐ = get_neighbor_opposite(τ, p)
+
+        if τ === τₐ || τ ∈ deleted || τₐ ∈ deleted
+            continue
+        end
+
+        a, b, c, d = get_commonface_and_opposite(τₐ, τ)
+
+        if in_circumsphere(τ, d, points)
+            # Case 1?
+            if line_intersects_triangle(p, d, a, b, c, points)
+                t1, t2, t3 = flip23(τ, τₐ, points)
+                push!(deleted, τ)
+                push!(deleted, τₐ)
+
+                push!(stack, t1)
+                push!(stack, t2)
+                push!(stack, t3)
+            else#if !line_intersects_triangle(p, d, a, b, c, points)
+                # check if tet opposite c is pdab
+                pdab = get_neighbor_opposite(τ, c)
+                if simplex_is(pdab, p, d, a, b)
+                    t1, t2 = flip32(τ, τₐ, pdab, points)
+                    push!(deleted, τ)
+                    push!(deleted, τₐ)
+                    push!(deleted, pdab)
+
+                    push!(stack, t1)
+                    push!(stack, t2)
+                    continue
+                end
+
+                # check if tet opposite b is pdca
+                pdca = get_neighbor_opposite(τ, b)
+                if simplex_is(pdca, p, d, c, a)
+                    t1, t2 = flip32(τ, τₐ, pdca, points)
+                    push!(deleted, τ)
+                    push!(deleted, τₐ)
+                    push!(deleted, pdca)
+
+                    push!(stack, t1)
+                    push!(stack, t2)
+                    continue
+                end
+
+                # check if tet opposite a is pdbc
+                pdbc = get_neighbor_opposite(τ, a)
+                if simplex_is(pdbc, p, d, b, c)
+                    t1, t2 = flip32(τ, τₐ, pdbc, points)
+                    push!(deleted, τ)
+                    push!(deleted, τₐ)
+                    push!(deleted, pdbc)
+
+                    push!(stack, t1)
+                    push!(stack, t2)
+                    continue
+                end
+            end
+        end
+    end
+
+    return t1
 end
 
-function delaunay()
+function delaunay_tet(points)
+    DIM = size(points, 1)
+    N = size(points, 2)
+    @assert DIM == 3
 
+    t = DelaunaySimplex{4}(1, 2, 3, 4)
+    stack = Stack{DelaunayTet}()
+
+    for i in (DIM+2):N
+        t = insert_one_point(t, i, points, stack)
+    end
+
+    return t
 end
 
+function get_neighbor_opposite(t::DelaunayTet, p::Int)
+    for i in 1:4
+        if t.vertices[i] == p
+            return t.neighbors[5-i]
+        end
+    end
 
+    return t
+end
+
+function get_commonface_and_opposite(t::DelaunayTet, n::DelaunayTet)
+    nn = get_neighbor_number(t, n)
+    return get_commonface_and_opposite(t, nn)
+end
+
+function get_commonface_and_opposite(t::DelaunayTet, n::Int)
+    if n == 1
+        v1 = t.vertices[1]
+        v2 = t.vertices[3]
+        v3 = t.vertices[2]
+        q = t.vertices[4]
+        return v1, v2, v3, q
+    elseif n == 2
+        v1 = t.vertices[1]
+        v2 = t.vertices[2]
+        v3 = t.vertices[4]
+        q = t.vertices[3]
+        return v1, v2, v3, q
+    elseif n == 3
+        v1 = t.vertices[1]
+        v2 = t.vertices[4]
+        v3 = t.vertices[3]
+        q = t.vertices[2]
+        return v1, v2, v3, q
+    else
+        v1 = t.vertices[2]
+        v2 = t.vertices[3]
+        v3 = t.vertices[4]
+        q = t.vertices[1]
+        return v1, v2, v3, q
+    end
+end
+
+function get_neighbor_number(t::DelaunayTet, n::DelaunayTet)
+    for i in 1:4
+        if t.neighbors[i] === n
+            return i
+        end
+    end
+
+    return 0
+end
+
+# Visualization
 
 function viz(simplex::DelaunaySimplex{DIM}, points) where {DIM}
     visited = Set{DelaunaySimplex{DIM}}()
     tovisit = Stack{DelaunaySimplex{DIM}}()
 
-    fig, ax, plot = scatter(points)
+    fig, ax, plot = scatter(@view(points[:, 5:end]))
 
     push!(tovisit, simplex)
 
@@ -139,35 +257,52 @@ function viz(simplex::DelaunaySimplex{DIM}, points) where {DIM}
     display(fig)
 end
 
-function viz!(simplex::DelaunaySimplex{DIM}, points) where {DIM}
-    segment = zeros(DIM-1, 2)
+function viz!(simplex::DelaunaySimplex{DIM}, points; color=:red) where {DIM}
+    segment = zeros(DIM - 1, 2)
 
     for i in 1:(DIM-1)
+        if simplex.vertices[i] ≤ 4
+            continue
+        end
+
         segment[:, 1] .= @view points[:, simplex.vertices[i]]
 
         for j in (i+1):DIM
+            if simplex.vertices[j] ≤ 4
+                continue
+            end
+
             segment[:, 2] .= @view points[:, simplex.vertices[j]]
-            lines!(segment, color=:red)
+            lines!(segment, color=color)
         end
     end
 end
 
 
-function viz(DT::Delaunay{PAT,SAT,DIM}) where {PAT,SAT,DIM}
-    fig, ax, plt = scatter(DT.points)
-    n_simplices = size(DT.simplices, 2)
-    segment = zeros(3, 2)
 
-    for k in 1:n_simplices
-        for i in 1:DIM
-            segment[:, 1] .= @view DT.points[:, DT.simplices[k, i]]
+function is_delaunay(simplex::DelaunaySimplex{DIM}, points) where {DIM}
+    scheduled = Set{DelaunaySimplex{DIM}}()
+    tovisit = Stack{DelaunaySimplex{DIM}}()
 
-            for j in (i+1):(DIM+1)
-                segment[:, 2] .= @view DT.points[:, DT.simplices[k, j]]
-                lines!(segment, color=:red)
+    push!(tovisit, simplex)
+    push!(scheduled, simplex)
+
+    while !isempty(tovisit)
+        current = pop!(tovisit)
+
+        for i in 1:size(points, 2)
+            if i ∉ current.vertices && in_circumsphere(current, i, points)
+                return false
+            end
+        end
+
+        for neighbor in current.neighbors
+            if neighbor ∉ scheduled
+                push!(tovisit, neighbor)
+                push!(scheduled, neighbor)
             end
         end
     end
 
-    display(fig)
+    return true
 end
