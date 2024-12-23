@@ -14,4 +14,6 @@ include("voxel_voronoi/lloyd.jl")
 include("structure.jl")
 include("minimum_variance.jl")
 
+include("delaunay/delaunay.jl")
+
 end # module WeightedCVT
