@@ -137,23 +137,3 @@ function flip14(tet::DelaunayTet, p::Int, points)
 
     return t1, t2, t3, t4
 end
-
-# function flip41(tet1::Tetrahedron, tet2::Tetrahedron, tet3::Tetrahedron, tet4::Tetrahedron, points)
-#     a, b, c, e = tet1.vertices
-#     a, d, c, e = tet2.vertices
-#     a, b, d, e = tet3.vertices
-#     b, d, c, e = tet4.vertices
-#     # TODO: Figure out how to match orientations
-
-#     return Tetrahedron(a, b, c, d)
-# end
-
-# function flip44(tet1::Tetrahedron, tet2::Tetrahedron, tet3::Tetrahedron, tet4::Tetrahedron, points)
-#     a, b, c, d = tet1.vertices
-#     a, c, d, e = tet2.vertices
-#     b, c, d, f = tet3.vertices
-#     d, c, e, f = tet4.vertices
-#     # TODO: Figure out how to match orientations
-
-#     return Tetrahedron(a, b, c, e), Tetrahedron(a, b, e, d), Tetrahedron(b, c, e, f), Tetrahedron(b, e, d, f)
-# end
