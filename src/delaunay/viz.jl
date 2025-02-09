@@ -22,6 +22,7 @@ function viz(simplex::DelaunaySimplex{DIM}, points) where {DIM}
     end
 
     display(fig)
+    return fig, ax, plot
 end
 
 function viz!(simplex::DelaunaySimplex{DIM}, points; color=:red) where {DIM}

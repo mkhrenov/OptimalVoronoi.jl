@@ -45,7 +45,7 @@ end
 
 include("predicates.jl")
 include("flips.jl")
-include("dense_delaunay.jl")
+include("condense_delaunay.jl")
 include("viz.jl")
 
 
