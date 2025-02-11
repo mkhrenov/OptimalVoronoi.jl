@@ -3,22 +3,25 @@ function condense_delaunay(root_simplex::DelaunaySimplex{DIM}, vertices::DMT, SM
     face_list, face_map, volumes_to_faces = enumerate_faces(simplex_list, simplex_map)
     edge_list, edge_map, faces_to_edges = enumerate_edges(face_list, face_map)
 
-    N_vertices = length(vertices)
-    N_edges = length(edge_list)
-    N_faces = length(face_list)
-    N_volumes = length(simplex_list)
+    reduced_vertices = vertices[:, 5:end]
+
+    @show N_vertices = size(reduced_vertices, 2)
+    @show N_edges = length(edge_list)
+    @show N_faces = length(face_list)
+    @show N_volumes = length(simplex_list)
 
     E2 = SMT(adjacency_list_to_incidence_matrix(volumes_to_faces, N_faces))
     E1 = SMT(adjacency_list_to_incidence_matrix(faces_to_edges, N_edges))
     E0 = SMT(adjacency_list_to_incidence_matrix(reshape(reinterpret(Int, edge_list), (2, :))', N_vertices))
 
     cell_centers = DMT(undef, 3, N_volumes)
+    r = zeros(N_volumes)
     for (i, simplex) in enumerate(simplex_list)
-        circumcenter!(view(cell_centers, :, i), simplex, vertices)
+        r[i] = circumcenter!(view(cell_centers, :, i), simplex, reduced_vertices)
     end
 
-    return CellComplex{DMT,SMT}(
-        vertices, cell_centers,
+    return r, CellComplex{DMT,SMT}(
+        reduced_vertices, cell_centers,
         E0, E1, E2)
 end
 
@@ -38,8 +41,9 @@ function enumerate_simplices(simplex::DelaunaySimplex{DIM}) where {DIM}
 
         if !(1 in current.vertices || 2 in current.vertices || 3 in current.vertices || 4 in current.vertices)
             i += 1
-            simplex_map[current.vertices] = i
-            push!(simplex_list, current.vertices)
+            simp = tuple([v - 4 for v in current.vertices]...)
+            simplex_map[simp] = i
+            push!(simplex_list, simp)
         end
 
         for neighbor in current.neighbors
@@ -189,7 +193,16 @@ function circumcenter!(center_vec, simplex::NTuple{4,Int}, vertices)
         r4, v4[1], v4[2], 1,
     ))
 
+    c = det(SMatrix{4,4}(
+        r1, v1[1], v1[2], v1[3],
+        r2, v2[1], v2[2], v2[3],
+        r3, v3[1], v3[2], v3[3],
+        r4, v4[1], v4[2], v4[3],
+    ))
+
     center_vec[1] = Dx / (2 * a)
     center_vec[2] = Dy / (2 * a)
     center_vec[3] = Dz / (2 * a)
+
+    return √(Dx^2 + Dy^2 + Dz^2 - 4 * a * c) / abs(2 * a)
 end

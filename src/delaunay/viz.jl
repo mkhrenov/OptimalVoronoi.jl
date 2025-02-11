@@ -1,5 +1,66 @@
 # Visualization
 
+function viz(complex::CellComplex{DMT,SMT}; edge_color=:green) where {DMT,SMT}
+    fig = Figure()
+    lscene = LScene(fig[1,1])
+    viz!(complex; edge_color=edge_color)
+end
+
+function viz!(complex::CellComplex{DMT,SMT}; edge_color=:green) where {DMT,SMT}
+    scatter!(complex.vertices)
+    scatter!(complex.cell_centers)
+
+    segment = zeros(3, 2)
+    rowvec = rowvals(complex.E0T)
+
+    for i in 1:n_edges(complex)
+        if length(nzrange(complex.E0T, i)) != 2
+            continue
+        end
+
+        for (c, j) in enumerate(nzrange(complex.E0T, i))
+            v = rowvec[j]
+            segment[:, c] .= @view complex.vertices[:, v]
+        end
+
+        lines!(segment, color=edge_color)
+    end
+
+    display(current_figure())
+end
+
+function viz(subcomplex::SubComplex{DMT,SMT,V}; edge_color=:green) where {DMT,SMT,V}
+    fig = Figure()
+    lscene = LScene(fig[1,1])
+    viz!(subcomplex; edge_color=edge_color)
+end
+
+function viz!(subcomplex::SubComplex{DMT,SMT,V}; edge_color=:green) where {DMT,SMT,V}
+    complex = subcomplex.parent
+
+    scatter!(complex.vertices[:, subcomplex.vertex_sub])
+    scatter!(complex.cell_centers[:, subcomplex.volume_sub])
+
+    segment = zeros(3, 2)
+    rowvec = rowvals(complex.E0T)
+
+    for i in 1:n_edges(complex)
+        if !subcomplex.edge_sub[i] || length(nzrange(complex.E0T, i)) != 2
+            continue
+        end
+
+        for (c, j) in enumerate(nzrange(complex.E0T, i))
+            v = rowvec[j]
+            segment[:, c] .= @view complex.vertices[:, v]
+        end
+
+        lines!(segment, color=edge_color)
+    end
+
+    display(current_figure())
+end
+
+
 function viz(simplex::DelaunaySimplex{DIM}, points) where {DIM}
     visited = Set{DelaunaySimplex{DIM}}()
     tovisit = Stack{DelaunaySimplex{DIM}}()
