@@ -81,6 +81,7 @@ function viz!(subcomplex::SubComplex{DMT,SMT,V}; edge_color=:green) where {DMT,S
     end
 
     triangle = zeros(3, 3)
+    triangle_faces = [1 2 3]
     for i in 1:n_faces(complex)
         if !subcomplex.face_sub[i]
             continue
@@ -103,7 +104,7 @@ function viz!(subcomplex::SubComplex{DMT,SMT,V}; edge_color=:green) where {DMT,S
                 triangle[:, c+1] .= @view complex.vertices[:, j]
             end
 
-            mesh!(triangle, [1 2 3], color=face_color, alpha=0.5)
+            mesh!(triangle, triangle_faces, color=face_color, alpha=0.5)
         end
     end
 
