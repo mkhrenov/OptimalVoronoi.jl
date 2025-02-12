@@ -27,6 +27,7 @@ function viz!(complex::CellComplex{DMT,SMT}; edge_color=:green) where {DMT,SMT}
     end
 
     triangle = zeros(3, 3)
+    triangle_faces = [1 2 3]
     for i in 1:n_faces(complex)
         edges_in_face = view(rowvals(complex.E1T), nzrange(complex.E1T, i))
         v0 = view(rowvals(complex.E0T), nzrange(complex.E0T, edges_in_face[1]))[1]
@@ -45,7 +46,7 @@ function viz!(complex::CellComplex{DMT,SMT}; edge_color=:green) where {DMT,SMT}
                 triangle[:, c+1] .= @view complex.vertices[:, j]
             end
 
-            mesh!(triangle, [1 2 3], color=face_color, alpha=0.5)
+            mesh!(triangle, triangle_faces, color=face_color, alpha=0.5, backlight=1.0)
         end
     end
 
@@ -104,7 +105,7 @@ function viz!(subcomplex::SubComplex{DMT,SMT,V}; edge_color=:green) where {DMT,S
                 triangle[:, c+1] .= @view complex.vertices[:, j]
             end
 
-            mesh!(triangle, triangle_faces, color=face_color, alpha=0.5)
+            mesh!(triangle, triangle_faces, color=face_color, alpha=0.5, backlight=1.0)
         end
     end
 
