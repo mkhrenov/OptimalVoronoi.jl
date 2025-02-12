@@ -2,7 +2,7 @@
 
 function viz(complex::CellComplex{DMT,SMT}; edge_color=:green) where {DMT,SMT}
     fig = Figure()
-    lscene = LScene(fig[1,1])
+    lscene = LScene(fig[1, 1])
     viz!(complex; edge_color=edge_color)
 end
 
@@ -26,12 +26,35 @@ function viz!(complex::CellComplex{DMT,SMT}; edge_color=:green) where {DMT,SMT}
         lines!(segment, color=edge_color)
     end
 
+    triangle = zeros(3, 3)
+    for i in 1:n_faces(complex)
+        edges_in_face = view(rowvals(complex.E1T), nzrange(complex.E1T, i))
+        v0 = view(rowvals(complex.E0T), nzrange(complex.E0T, edges_in_face[1]))[1]
+        triangle[:, 1] .= @view complex.vertices[:, v0]
+
+        face_color = RGBf(rand(3)...)
+
+        for j in @view edges_in_face[2:end]
+            vertices_in_edge = view(rowvals(complex.E0T), nzrange(complex.E0T, j))
+
+            if length(vertices_in_edge) != 2
+                continue
+            end
+
+            for (c, j) in enumerate(vertices_in_edge)
+                triangle[:, c+1] .= @view complex.vertices[:, j]
+            end
+
+            mesh!(triangle, [1 2 3], color=face_color, alpha=0.5)
+        end
+    end
+
     display(current_figure())
 end
 
 function viz(subcomplex::SubComplex{DMT,SMT,V}; edge_color=:green) where {DMT,SMT,V}
     fig = Figure()
-    lscene = LScene(fig[1,1])
+    lscene = LScene(fig[1, 1])
     viz!(subcomplex; edge_color=edge_color)
 end
 
@@ -55,6 +78,33 @@ function viz!(subcomplex::SubComplex{DMT,SMT,V}; edge_color=:green) where {DMT,S
         end
 
         lines!(segment, color=edge_color)
+    end
+
+    triangle = zeros(3, 3)
+    for i in 1:n_faces(complex)
+        if !subcomplex.face_sub[i]
+            continue
+        end
+
+        edges_in_face = view(rowvals(complex.E1T), nzrange(complex.E1T, i))
+        v0 = view(rowvals(complex.E0T), nzrange(complex.E0T, edges_in_face[1]))[1]
+        triangle[:, 1] .= @view complex.vertices[:, v0]
+
+        face_color = RGBf(rand(3)...)
+
+        for j in @view edges_in_face[2:end]
+            vertices_in_edge = view(rowvals(complex.E0T), nzrange(complex.E0T, j))
+
+            if length(vertices_in_edge) != 2
+                continue
+            end
+
+            for (c, j) in enumerate(vertices_in_edge)
+                triangle[:, c+1] .= @view complex.vertices[:, j]
+            end
+
+            mesh!(triangle, [1 2 3], color=face_color, alpha=0.5)
+        end
     end
 
     display(current_figure())
