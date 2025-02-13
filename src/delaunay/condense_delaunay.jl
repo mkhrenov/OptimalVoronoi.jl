@@ -1,4 +1,4 @@
-function condense_delaunay(root_simplex::DelaunaySimplex{DIM}, vertices::DMT, SMT) where {DIM,DMT}
+function condense_delaunay(root_simplex::DelaunaySimplex{DIM}, vertices::DMT; SMT=SparseMatrixCSC) where {DIM,DMT}
     simplex_list, simplex_map = enumerate_simplices(root_simplex)
     face_list, face_map, volumes_to_faces = enumerate_faces(simplex_list, simplex_map)
     edge_list, edge_map, faces_to_edges = enumerate_edges(face_list, face_map)

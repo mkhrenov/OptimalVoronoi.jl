@@ -178,3 +178,12 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
         E0_new[extant_edges, extant_indices], E1_new[extant_faces, extant_edges], E2_new[:, extant_faces]
     )
 end
+
+function bounded_voronoi(points::DMT, Ω::F; SMT=SparseMatrixCSC) where {DMT,F}
+    t = WeightedCVT.delaunay_tet(points)
+
+    r, dense_delaunay = WeightedCVT.condense_delaunay(t, points; SMT=SMT)
+    dense_voronoi = WeightedCVT.dual_complex(dense_delaunay)
+
+    return WeightedCVT.bound_voronoi(dense_voronoi, dense_delaunay, Ω)
+end
