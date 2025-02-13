@@ -14,8 +14,7 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
     # Find starting points to form new edges
     # These are 
     i = 1
-    new_points = zeros(3, N_new_edges)
-    start_vertex = zeros(Int, N_new_edges)
+    new_points = DMT(zeros(3, N_new_edges))
     edge_indices = zeros(Int, N_new_edges)
     for e in 1:n_edges(unbounded_voronoi)
         if !voronoi_edges_to_add[e]
@@ -26,9 +25,10 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
         # Find the start vertex, the Voronoi vertex of the edges-to-add that is present in the subset
         vertices_in_edge = unbounded_voronoi.edge_vertex_set[e]
         to_drop = 0
+        start_vertex::Int = 0
         for v in vertices_in_edge
             if pruned_voronoi.vertex_sub[v]
-                start_vertex[i] = v
+                start_vertex = v
             else
                 to_drop = v
             end
@@ -40,19 +40,21 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
         #   - which is the tetrahedron vertex not in the face vertex set 
         # Use that to get the normal of the Delaunay face (direction vector for the edge)
         vertices_in_face = delaunay.face_vertex_set[e]
-        vertices_in_tet = delaunay.cell_vertex_set[start_vertex[i]]
+        vertices_in_tet = delaunay.cell_vertex_set[start_vertex]
         p0 = view(delaunay.vertices, :, collect(vertices_in_face)[1])
         p1 = view(delaunay.vertices, :, collect(vertices_in_face)[2])
         p2 = view(delaunay.vertices, :, collect(vertices_in_face)[3])
         po = view(delaunay.vertices, :, collect(setdiff(vertices_in_tet, vertices_in_face))[1])
 
         normal = triangle_normal(p0, p1, p2, po)
-        init = SVector{3}((@view unbounded_voronoi.vertices[:, start_vertex[i]])...)
+        init = SVector{3}(unbounded_voronoi.vertices[1, start_vertex],
+            unbounded_voronoi.vertices[2, start_vertex],
+            unbounded_voronoi.vertices[3, start_vertex])
 
         # Use normal vector and start vertex to get intersection with ∂Ω via SDF
         new_points[:, i] .= intersect_sdf(init, normal, Ω; tol=tol)
 
-        # Need E0[e, i+Nv]=1, E0[e, start_vertex[i]]=1
+        # Need E0[e, i+Nv]=1, E0[e, start_vertex]=1
         # unbounded_voronoi.E0[e, i+n_vertices(unbounded_voronoi)] = 1 # this will be beyond the extant E0
         if to_drop > 0
             unbounded_voronoi.E0[e, to_drop] = 0
@@ -63,7 +65,7 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
     end
 
     E0_new = hcat(dropzeros(unbounded_voronoi.E0), sparse(edge_indices, collect(1:N_new_edges), ones(N_new_edges), n_edges(unbounded_voronoi), N_new_edges))
-    vertices_new = hcat(unbounded_voronoi.vertices, new_points)
+    vertices_new::DMT = hcat(unbounded_voronoi.vertices, new_points)
 
     extant_indices = vcat(pruned_voronoi.vertex_sub, trues(N_new_edges))
     extant_edges = voronoi_edges_to_add .|| pruned_voronoi.edge_sub
@@ -110,7 +112,7 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
         # First, compute mean out towards surface direction 
         init = SVector{3}(unbounded_voronoi.cell_centers[1, c], unbounded_voronoi.cell_centers[2, c], unbounded_voronoi.cell_centers[3, c])
         dir = zero(SVector{3})
-        for v in vertices_to_close
+        for v::Int in vertices_to_close
             dir += SVector{3}(vertices_new[1, v], vertices_new[2, v], vertices_new[3, v])
         end
         dir = (dir / length(vertices_to_close)) - init
@@ -123,7 +125,9 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
         # for v in vertices_to_close
         inward_edge = Dict{Int,Int}()
         for e in edges_to_close
-            v1, v2 = rowvals(E0_newT)[nzrange(E0_newT, e)]
+            vs = view(rowvals(E0_newT), nzrange(E0_newT, e))
+            v1::Int = vs[1]
+            v2::Int = vs[2]
 
             if !haskey(inward_edge, v1)
                 N_new_surface_edges += 1

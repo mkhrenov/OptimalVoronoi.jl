@@ -65,7 +65,7 @@ function frustum_centroid(complex::CellComplex{DMT,SMT}, cell::Int, face::Int) w
 
     edges_in_face = view(rowvals(complex.E1T), nzrange(complex.E1T, face))
 
-    for e in edges_in_face
+    for e::Int in edges_in_face
         edge_vertices = collect(complex.edge_vertex_set[e])
 
         simp_vol = simplex_volume(
@@ -108,25 +108,22 @@ function simplex_centroid(a, b, c, d)
     return (av + bv + cv + dv) / 4.0
 end
 
-function face_centroid(complex::CellComplex{DMT,SMT}, face) where {DMT,SMT}
+function face_centroid(complex::CellComplex{DMT,SMT}, face::Int) where {DMT,SMT}
     verts = complex.vertices
     face_centr = zero(SVector{3})
     area = 0.0
 
-    triangle = zeros(3, 3)
-
     edges_in_face = view(rowvals(complex.E1T), nzrange(complex.E1T, face))
 
-    v0 = view(rowvals(complex.E0T), nzrange(complex.E0T, edges_in_face[1]))[1]
+    v0::Int = view(rowvals(complex.E0T), nzrange(complex.E0T, edges_in_face[1]))[1]
     p0 = SVector{3}(verts[1, v0], verts[2, v0], verts[3, v0])
 
-    triangle[:, 1] .= @view verts[:, v0]
-
-
-    for e in @view edges_in_face[2:end]
-        v = view(rowvals(complex.E0T), nzrange(complex.E0T, e))
-        p1 = SVector{3}(verts[1, v[1]], verts[2, v[1]], verts[3, v[1]])
-        p2 = SVector{3}(verts[1, v[2]], verts[2, v[2]], verts[3, v[2]])
+    for e::Int in @view edges_in_face[2:end]
+        v = nzrange(complex.E0T, e)
+        v1::Int = rowvals(complex.E0T)[v[1]]
+        v2::Int = rowvals(complex.E0T)[v[2]]
+        p1 = SVector{3}(verts[1, v1], verts[2, v1], verts[3, v1])
+        p2 = SVector{3}(verts[1, v2], verts[2, v2], verts[3, v2])
 
         triangle_centroid = (p0 + p1 + p2) / 3.0
         triangle_area = (1 / 2) * norm((p1 - p0) × (p2 - p0))
