@@ -109,7 +109,7 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
         edges_to_close = view(rowvals(dangling_edges), nzrange(dangling_edges, c))
         # First, compute mean out towards surface direction 
         init = SVector{3}(unbounded_voronoi.cell_centers[1, c], unbounded_voronoi.cell_centers[2, c], unbounded_voronoi.cell_centers[3, c])
-        dir = SVector{3}(0.0, 0.0, 0.0)
+        dir = zero(SVector{3})
         for v in vertices_to_close
             dir += SVector{3}(vertices_new[1, v], vertices_new[2, v], vertices_new[3, v])
         end

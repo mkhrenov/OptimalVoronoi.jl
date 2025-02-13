@@ -115,7 +115,7 @@ function triangle_normal(p0, p1, p2, o)
     v2 = SVector{3}(p2[1], p2[2], p2[3]) - SVector{3}(p0[1], p0[2], p0[3])
     ov = SVector{3}(o[1], o[2], o[3])
 
-    n = cross(v1, v2)
+    n = v1 × v2
 
     if (ov - p0) ⋅ n > 0.0
         n = n * -1

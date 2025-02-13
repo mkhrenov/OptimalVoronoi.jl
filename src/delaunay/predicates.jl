@@ -68,12 +68,12 @@ function line_intersects_triangle(p1::VT, p2::VT, a::VT, b::VT, c::VT) where {T,
     e1 = bv - av
     e2 = cv - av
 
-    n = cross(e1, e2)
+    n = e1 × e2
     det = -dot(dir, n)
     invdet = 1.0 / det
 
     a0 = origin - av
-    da0 = cross(a0, dir)
+    da0 = a0 × dir
 
     u = dot(e2, da0) * invdet
     v = -dot(e1, da0) * invdet
