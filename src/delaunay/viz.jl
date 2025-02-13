@@ -10,6 +10,8 @@ function viz!(complex::CellComplex{DMT,SMT}; edge_color=:green) where {DMT,SMT}
     scatter!(complex.vertices)
     scatter!(complex.cell_centers)
 
+    cell_colors = [RGBf(rand(3)...) for _ in 1:n_volumes(complex)]
+
     segment = zeros(3, 2)
     rowvec = rowvals(complex.E0T)
 
@@ -28,22 +30,27 @@ function viz!(complex::CellComplex{DMT,SMT}; edge_color=:green) where {DMT,SMT}
 
     triangle = zeros(3, 3)
     triangle_faces = [1 2 3]
-    for i in 1:n_faces(complex)
-        edges_in_face = view(rowvals(complex.E1T), nzrange(complex.E1T, i))
+    for face in 1:n_faces(complex)
+        edges_in_face = view(rowvals(complex.E1T), nzrange(complex.E1T, face))
         v0 = view(rowvals(complex.E0T), nzrange(complex.E0T, edges_in_face[1]))[1]
         triangle[:, 1] .= @view complex.vertices[:, v0]
 
-        face_color = RGBf(rand(3)...)
+        face_color = zero(RGBf)
 
-        for j in @view edges_in_face[2:end]
-            vertices_in_edge = view(rowvals(complex.E0T), nzrange(complex.E0T, j))
+        cells_of_face = view(rowvals(complex.E2), nzrange(complex.E2, face))
+        for cell in cells_of_face
+            face_color += cell_colors[cell] / length(cells_of_face)
+        end
+
+        for edge in @view edges_in_face[2:end]
+            vertices_in_edge = view(rowvals(complex.E0T), nzrange(complex.E0T, edge))
 
             if length(vertices_in_edge) != 2
                 continue
             end
 
-            for (c, j) in enumerate(vertices_in_edge)
-                triangle[:, c+1] .= @view complex.vertices[:, j]
+            for (c, vertex) in enumerate(vertices_in_edge)
+                triangle[:, c+1] .= @view complex.vertices[:, vertex]
             end
 
             mesh!(triangle, triangle_faces, color=face_color, alpha=0.5, backlight=1.0)

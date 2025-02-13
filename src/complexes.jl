@@ -11,50 +11,15 @@ struct CellComplex{DMT,SMT}
     E1T::SMT # Face to edge incidence matrix
     E2T::SMT # Volume to face incidence matrix
 
-    edge_vertex_set::Vector{Set{Int}}
-    face_vertex_set::Vector{Set{Int}}
-    cell_vertex_set::Vector{Set{Int}}
-
     function CellComplex{DMT,SMT}(vertices::DMT, cell_centers::DMT, E0::SMT, E1::SMT, E2::SMT) where {DMT,SMT}
         E0T = SMT(transpose(E0))
         E1T = SMT(transpose(E1))
         E2T = SMT(transpose(E2))
 
-        N_edges = size(E0, 1)
-        N_faces = size(E1, 1)
-        N_cells = size(E2, 1)
-
-        edge_vertex_set = Vector{Set{Int}}(undef, N_edges)
-        face_vertex_set = Vector{Set{Int}}(undef, N_faces)
-        cell_vertex_set = Vector{Set{Int}}(undef, N_cells)
-
-        for e in 1:N_edges
-            edge_vertex_set[e] = Set(rowvals(E0T)[nzrange(E0T, e)])
-        end
-
-        for f in 1:N_faces
-            edges_in_face = view(rowvals(E1T), nzrange(E1T, f))
-            face_vertex_set[f] = Set{Int}()
-            for e in edges_in_face
-                face_vertex_set[f] = union(face_vertex_set[f], edge_vertex_set[e])
-            end
-        end
-
-        for c in 1:N_cells
-            faces_in_cell = view(rowvals(E2T), nzrange(E2T, c))
-            cell_vertex_set[c] = Set{Int}()
-            for f in faces_in_cell
-                cell_vertex_set[c] = union(cell_vertex_set[c], face_vertex_set[f])
-            end
-        end
-
         return new{DMT,SMT}(
             vertices, cell_centers,
             E0, E1, E2,
-            E0T, E1T, E2T,
-            edge_vertex_set,
-            face_vertex_set,
-            cell_vertex_set)
+            E0T, E1T, E2T)
     end
 end
 

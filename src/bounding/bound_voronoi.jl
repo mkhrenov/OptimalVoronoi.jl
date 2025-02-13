@@ -11,6 +11,9 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
     # There will also be just as many new points
     N_new_edges = sum(voronoi_edges_to_add)
 
+    delaunay_face_to_vertex = delaunay.E0T * delaunay.E1T
+    delaunay_cell_to_vertex = delaunay_face_to_vertex * delaunay.E2T
+
     # Find starting points to form new edges
     # These are 
     i = 1
@@ -23,7 +26,7 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
         edge_indices[i] = e
 
         # Find the start vertex, the Voronoi vertex of the edges-to-add that is present in the subset
-        vertices_in_edge = unbounded_voronoi.edge_vertex_set[e]
+        vertices_in_edge = view(rowvals(unbounded_voronoi.E0T), nzrange(unbounded_voronoi.E0T, e))
         to_drop = 0
         start_vertex::Int = 0
         for v in vertices_in_edge
@@ -39,12 +42,19 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
         # - the Delaunay vertex opposite it
         #   - which is the tetrahedron vertex not in the face vertex set 
         # Use that to get the normal of the Delaunay face (direction vector for the edge)
-        vertices_in_face = delaunay.face_vertex_set[e]
-        vertices_in_tet = delaunay.cell_vertex_set[start_vertex]
-        p0 = view(delaunay.vertices, :, collect(vertices_in_face)[1])
-        p1 = view(delaunay.vertices, :, collect(vertices_in_face)[2])
-        p2 = view(delaunay.vertices, :, collect(vertices_in_face)[3])
-        po = view(delaunay.vertices, :, collect(setdiff(vertices_in_tet, vertices_in_face))[1])
+        vertices_in_face = view(rowvals(delaunay_face_to_vertex), nzrange(delaunay_face_to_vertex, e))
+        vertices_in_tet = view(rowvals(delaunay_cell_to_vertex), nzrange(delaunay_cell_to_vertex, start_vertex))
+        p0 = view(delaunay.vertices, :, vertices_in_face[1])
+        p1 = view(delaunay.vertices, :, vertices_in_face[2])
+        p2 = view(delaunay.vertices, :, vertices_in_face[3])
+        vo = 0
+        for v in vertices_in_tet
+            if v ∉ vertices_in_face
+                vo = v
+                break
+            end
+        end
+        po = view(delaunay.vertices, :, vo)
 
         normal = triangle_normal(p0, p1, p2, po)
         init = SVector{3}(unbounded_voronoi.vertices[1, start_vertex],
@@ -184,7 +194,7 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
 end
 
 function bounded_voronoi(points::DMT, Ω::F; SMT=SparseMatrixCSC) where {DMT,F}
-    extended_points = hcat([100 0 0 0; 0 100 0 0; 0 0 100 0], points)
+    extended_points = hcat([1000*maximum(points) 0 0 0; 0 1000*maximum(points) 0 0; 0 0 1000*maximum(points) 0], points)
     t = delaunay_tet(extended_points)
 
     r, dense_delaunay = condense_delaunay(t, extended_points; SMT=SMT)
