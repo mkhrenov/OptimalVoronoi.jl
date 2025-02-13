@@ -12,7 +12,7 @@ function trilinear_interpolation(coord, array)
 
     if (x1 > Nx || y1 > Ny || z1 > Nz ||
         x0 < 1 || y0 < 1 || z0 < 1)
-        return Inf
+        return 1.0
     end
 
     xd = (coord[1] - x0) / (x1 - x0)
@@ -42,4 +42,18 @@ end
 # 3 x N points
 function in_Ω(points, Ω::F) where {F}
     return vec(mapslices(x -> Ω(x) < 0.0, points, dims=1))
+end
+
+function intersect_sdf(init, dir, Ω::F; tol=1e-2) where {F}
+    t = 1.0
+    # Use dir vector and start vertex to get intersection with ∂Ω via SDF
+    for k in 1:20
+        ω = Ω(init + t * dir)
+        if abs(ω) < tol
+            break
+        end
+        t -= ω
+    end
+
+    return init + t * dir
 end

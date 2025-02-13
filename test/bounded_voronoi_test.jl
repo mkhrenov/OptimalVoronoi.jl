@@ -4,7 +4,7 @@ using GLMakie
 
 sdf = zeros(20, 20, 20)
 for cidx in CartesianIndices(sdf)
-    sdf[cidx] = ((cidx[1] - 10)^2 + (cidx[2] - 10)^2 + (cidx[3] - 10)^2) - 8^2
+    sdf[cidx] = √((cidx[1] - 10)^2 + (cidx[2] - 10)^2 + (cidx[3] - 10)^2) - 8
 end
 
 d = 4
@@ -28,5 +28,8 @@ to_drop = .! WeightedCVT.in_Ω(dense_voronoi.vertices, Ω)
 
 s = WeightedCVT.prune_points(dense_voronoi, to_drop)
 
-WeightedCVT.viz(s)
+# WeightedCVT.viz(s)
+
+np = WeightedCVT.bound_voronoi(dense_voronoi, dense_delaunay, Ω)
+WeightedCVT.viz(np)
 volume!(sdf, algorithm=:iso, isovalue=0, isorange=0.5, alpha=0.05)
