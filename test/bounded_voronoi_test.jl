@@ -17,18 +17,8 @@ SMT = SparseMatrixCSC
 @time r, dense_delaunay = WeightedCVT.condense_delaunay(t, points, SMT)
 @time dense_voronoi = WeightedCVT.dual_complex(dense_delaunay)
 
-# WeightedCVT.viz(dense_delaunay)
-# WeightedCVT.viz(dense_voronoi, edge_color=:red)
-
-# boundary = WeightedCVT.get_boundary(dense_delaunay)
-# WeightedCVT.viz!(boundary)
-
 Ω = WeightedCVT.Ω_from_array(sdf)
-to_drop = .! WeightedCVT.in_Ω(dense_voronoi.vertices, Ω)
-
-s = WeightedCVT.prune_points(dense_voronoi, to_drop)
-
-# WeightedCVT.viz(s)
+to_drop = .!WeightedCVT.in_Ω(dense_voronoi.vertices, Ω)
 
 np = WeightedCVT.bound_voronoi(dense_voronoi, dense_delaunay, Ω)
 WeightedCVT.viz(np)
