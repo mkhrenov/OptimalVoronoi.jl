@@ -185,10 +185,10 @@ end
 
 function bounded_voronoi(points::DMT, Ω::F; SMT=SparseMatrixCSC) where {DMT,F}
     extended_points = hcat([100 0 0 0; 0 100 0 0; 0 0 100 0], points)
-    t = WeightedCVT.delaunay_tet(extended_points)
+    t = delaunay_tet(extended_points)
 
-    r, dense_delaunay = WeightedCVT.condense_delaunay(t, extended_points; SMT=SMT)
-    dense_voronoi = WeightedCVT.dual_complex(dense_delaunay)
+    r, dense_delaunay = condense_delaunay(t, extended_points; SMT=SMT)
+    dense_voronoi = dual_complex(dense_delaunay)
 
-    return WeightedCVT.bound_voronoi(dense_voronoi, dense_delaunay, Ω)
+    return bound_voronoi(dense_voronoi, dense_delaunay, Ω)
 end
