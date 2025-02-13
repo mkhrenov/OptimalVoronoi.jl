@@ -56,3 +56,29 @@ function average_kernel!(domain::CuDeviceArray, T::CuDeviceArray, volumes::CuDev
 
     return nothing
 end
+
+function find_min_variance(points)
+    t = delaunay_tet(points)
+    dense_delaunay = condense_delaunay(t, points, SMT)
+    dense_voronoi = dual_complex(dense_delaunay)
+    
+    return find_min_variance(points, dense_voronoi, dense_delaunay)
+end
+
+function find_min_variance(points, dense_voronoi, dense_delaunay)
+    graph_delaunay = 0
+
+    for i in 1:10
+
+
+        # Check Delaunay condition to validate Voronoi topology after update
+        # Only if it is violated, re-run the incremental flip algorithm
+        if !is_delaunay(dense_delaunay, points)
+            t = delaunay_tet(points)
+            dense_delaunay = condense_delaunay(t, points, SMT)
+            dense_voronoi = dual_complex(dense_delaunay)
+        end
+    end
+
+    return dense_voronoi, dense_delaunay
+end

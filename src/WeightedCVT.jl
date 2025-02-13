@@ -10,6 +10,8 @@ using CUDA
 include("complexes.jl")
 include("duality.jl")
 include("sdf.jl")
+include("integrals.jl")
+include("lloyd.jl")
 
 include("voxel_voronoi/voronoi.jl")
 include("voxel_voronoi/centroids.jl")

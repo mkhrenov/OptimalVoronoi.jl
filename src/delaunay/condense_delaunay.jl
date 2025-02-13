@@ -5,10 +5,10 @@ function condense_delaunay(root_simplex::DelaunaySimplex{DIM}, vertices::DMT; SM
 
     reduced_vertices = vertices[:, 5:end]
 
-    @show N_vertices = size(reduced_vertices, 2)
-    @show N_edges = length(edge_list)
-    @show N_faces = length(face_list)
-    @show N_volumes = length(simplex_list)
+    N_vertices = size(reduced_vertices, 2)
+    N_edges = length(edge_list)
+    N_faces = length(face_list)
+    N_volumes = length(simplex_list)
 
     E2 = SMT(adjacency_list_to_incidence_matrix(volumes_to_faces, N_faces))
     E1 = SMT(adjacency_list_to_incidence_matrix(faces_to_edges, N_edges))
@@ -145,7 +145,6 @@ function adjacency_list_to_incidence_matrix(adj_list, n_cols)
             r = i
             c = adj_list[i, j]
 
-            # @show r, c
             rv[(i-1)*k+j] = r
             cv[(i-1)*k+j] = c
         end

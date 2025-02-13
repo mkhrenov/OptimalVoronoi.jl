@@ -10,7 +10,11 @@ end
 
 points = 8 .* rand(3, 25) .+ 6
 
-@time voronoi = WeightedCVT.bounded_voronoi(points, Ω);
+@time voronoi = WeightedCVT.lloyd(points, Ω);
+
 voronoi.vertices .-= 0.5
 WeightedCVT.viz(voronoi)
 volume!(sdf, algorithm=:iso, isovalue=0, isorange=0.1, alpha=0.05)
+
+# bd = WeightedCVT.get_boundary(voronoi)
+# WeightedCVT.viz(bd)
