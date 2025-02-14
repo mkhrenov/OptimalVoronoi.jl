@@ -6,9 +6,9 @@ function trilinear_interpolation(coord, array)
     y0 = floor(Int, coord[2])
     z0 = floor(Int, coord[3])
 
-    x1 = ceil(Int, coord[1])
-    y1 = ceil(Int, coord[2])
-    z1 = ceil(Int, coord[3])
+    x1 = floor(Int, coord[1] + 1)
+    y1 = floor(Int, coord[2] + 1)
+    z1 = floor(Int, coord[3] + 1)
 
     if (x1 > Nx || y1 > Ny || z1 > Nz ||
         x0 < 1 || y0 < 1 || z0 < 1)
@@ -61,9 +61,9 @@ end
 function sample_from_discrete_sdf(sdf, N)
     M = ndims(sdf)
     cidxs = CartesianIndices(sdf)
-    points = [Float64(cidx[i]) for i in 1:M, cidx in shuffle(cidxs[(sdf).<(-0.5)])[1:N]]
-    points .+= rand(size(points)...)
-    points .-= 0.5
+    points = [Float64(cidx[i]) for i in 1:M, cidx in shuffle(cidxs[(sdf).<(-2)])[1:N]]
+    points .+= rand(size(points)...) .* 0.8
+    points .-= 0.4
 
     return points
 end
