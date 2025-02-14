@@ -1,3 +1,30 @@
+# Primitives to build up bead geometry
+function sdf_box!(sdf, px, py, pz, lx, ly, lz)
+    for cidx in CartesianIndices(sdf)
+        x, y, z = cidx[1], cidx[2], cidx[3]
+        dx = abs(x - px) / (lx / 2)
+        dy = abs(y - py) / (ly / 2)
+        dz = abs(z - pz) / (lz / 2)
+
+        d = 0.0
+        if dx > dy && dx > dz
+            d = (dx - 1.0) * (lx / 2)
+        elseif dy > dz
+            d = (dy - 1.0) * (ly / 2)
+        else
+            d = (dz - 1.0) * (lz / 2)
+        end
+
+        sdf[cidx] = min(sdf[cidx], d)
+    end
+end
+
+function sdf_sphere!(sdf, px, py, pz, r)
+    for cidx in CartesianIndices(sdf)
+        x, y, z = cidx[1], cidx[2], cidx[3]
+        sdf[cidx] = min(sdf[cidx], √((x - px)^2 + (y - py)^2 + (z - pz)^2) - r)
+    end
+end
 
 # Treat indices as XYZ
 function trilinear_interpolation(coord, array)
@@ -10,9 +37,11 @@ function trilinear_interpolation(coord, array)
     y1 = floor(Int, coord[2] + 1)
     z1 = floor(Int, coord[3] + 1)
 
-    if (x1 > Nx || y1 > Ny || z1 > Nz ||
-        x0 < 1 || y0 < 1 || z0 < 1)
-        return 1.0
+    if (x1 > Nx || y1 > Ny || z1 > Nz)
+        return max(x1 - Nx, y1 - Ny, z1 - Nz)
+    end
+    if (x0 < 1 || y0 < 1 || z0 < 1)
+        return max(1 - x0, 1 - y0, 1 - z0)
     end
 
     xd = (coord[1] - x0) / (x1 - x0)
@@ -61,7 +90,7 @@ end
 function sample_from_discrete_sdf(sdf, N)
     M = ndims(sdf)
     cidxs = CartesianIndices(sdf)
-    points = [Float64(cidx[i]) for i in 1:M, cidx in shuffle(cidxs[(sdf).<(-2)])[1:N]]
+    points = [Float64(cidx[i]) for i in 1:M, cidx in shuffle(cidxs[(sdf).<(-3)])[1:N]]
     points .+= rand(size(points)...) .* 0.8
     points .-= 0.4
 

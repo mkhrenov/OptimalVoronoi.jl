@@ -4,23 +4,14 @@ using GLMakie
 using Profile
 using Random
 
-sdf = zeros(30, 40, 30)
-for cidx in CartesianIndices(sdf)
-    if cidx[3] >= 10
-        sdf[cidx] = min(
-            √((cidx[1] - 10)^2 + (cidx[2] - 20)^2 + (cidx[3] - 10)^2) - 7,
-            √((cidx[1] - 20)^2 + (cidx[2] - 20)^2 + (cidx[3] - 10)^2) - 7,
-            √((cidx[1] - 15)^2 + (cidx[2] - 20)^2 + (cidx[3] - 10)^2) - 7,
-        )
-    else
-        sdf[cidx] = min(
-            max(abs(cidx[1] - 10), abs(cidx[2] - 20), abs(cidx[3] - 10)) - 9,
-            max(abs(cidx[1] - 20), abs(cidx[2] - 20), abs(cidx[3] - 10)) - 9,
-            max(abs(cidx[1] - 15), abs(cidx[2] - 20), abs(cidx[3] - 10)) - 9,
-        )
-    end
-end
-## The sdf is wrong
+sdf = ones(30, 40, 30) * Inf
+WeightedCVT.sdf_box!(sdf, 15, 20, 10, 24, 36, 10)
+WeightedCVT.sdf_sphere!(sdf, 15, 16, 15, 8)
+WeightedCVT.sdf_sphere!(sdf, 15, 18, 15, 8)
+WeightedCVT.sdf_sphere!(sdf, 15, 20, 15, 8)
+WeightedCVT.sdf_sphere!(sdf, 15, 22, 15, 8)
+WeightedCVT.sdf_sphere!(sdf, 15, 24, 15, 8)
+
 Ω = WeightedCVT.Ω_from_array(sdf)
 
 points = WeightedCVT.sample_from_discrete_sdf(sdf, 100)
