@@ -5,6 +5,7 @@ using GeometryBasics
 using Meshing
 using StaticArrays
 using SparseArrays
+using Random
 using CUDA
 
 include("complexes.jl")

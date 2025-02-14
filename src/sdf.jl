@@ -57,3 +57,13 @@ function intersect_sdf(init, dir, Ω::F; tol=1e-2) where {F}
 
     return init + t * dir
 end
+
+function sample_from_discrete_sdf(sdf, N)
+    M = ndims(sdf)
+    cidxs = CartesianIndices(sdf)
+    points = [Float64(cidx[i]) for i in 1:M, cidx in shuffle(cidxs[(sdf).<(-0.5)])[1:N]]
+    points .+= rand(size(points)...)
+    points .-= 0.5
+
+    return points
+end

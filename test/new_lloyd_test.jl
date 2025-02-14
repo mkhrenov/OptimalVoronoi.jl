@@ -22,21 +22,8 @@ for cidx in CartesianIndices(sdf)
 end
 Ω = WeightedCVT.Ω_from_array(sdf)
 
-points = zeros(3, 100)
-x = zeros(3)
-for k in 1:100
-    x[1] = 30 * rand()
-    x[2] = 40 * rand()
-    x[3] = 30 * rand()
+points = WeightedCVT.sample_from_discrete_sdf(sdf, 100)
 
-    while Ω(x) ≥ -1
-        x[1] = 30 * rand()
-        x[2] = 40 * rand()
-        x[3] = 30 * rand()
-    end
-
-    points[:, k] .= x
-end
 pcopy = copy(points)
 scatter(points)
 
@@ -52,8 +39,8 @@ points .= pcopy
 # points .= pcopy
 # @profview_allocs voronoi = WeightedCVT.lloyd(points, Ω) sample_rate=0.0001
 
-voronoi.vertices .-= 0.6
-voronoi.cell_centers .-= 0.6
+voronoi.vertices .-= 0.5
+voronoi.cell_centers .-= 0.5
 WeightedCVT.viz(voronoi)
 volume!(sdf, algorithm=:iso, isovalue=0, isorange=0.1, alpha=0.1)
 
