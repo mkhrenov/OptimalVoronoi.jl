@@ -23,10 +23,36 @@ struct CellComplex{DMT,SMT}
     end
 end
 
-n_vertices(complex::CellComplex) = size(complex.vertices, 2)
+n_verts(complex::CellComplex) = size(complex.vertices, 2)
 n_edges(complex::CellComplex) = size(complex.E0, 1)
 n_faces(complex::CellComplex) = size(complex.E1, 1)
-n_volumes(complex::CellComplex) = size(complex.E2, 1)
+n_cells(complex::CellComplex) = size(complex.E2, 1)
+
+# Iterators for CSC matrices
+
+function verts_of_edge(complex::CellComplex{DMT,SparseMatrixCSC{Int,Int}}, edge::Int) where {DMT}
+    return view(rowvals(complex.E0T), nzrange(complex.E0T, edge))
+end
+
+function edges_of_face(complex::CellComplex{DMT,SparseMatrixCSC{Int,Int}}, face::Int) where {DMT}
+    return view(rowvals(complex.E1T), nzrange(complex.E1T, face))
+end
+
+function faces_of_cell(complex::CellComplex{DMT,SparseMatrixCSC{Int,Int}}, cell::Int) where {DMT}
+    return view(rowvals(complex.E2T), nzrange(complex.E2T, cell))
+end
+
+function edges_of_vert(complex::CellComplex{DMT,SparseMatrixCSC{Int,Int}}, vert::Int) where {DMT}
+    return view(rowvals(complex.E0), nzrange(complex.E0, vert))
+end
+
+function faces_of_edge(complex::CellComplex{DMT,SparseMatrixCSC{Int,Int}}, edge::Int) where {DMT}
+    return view(rowvals(complex.E1), nzrange(complex.E1, edge))
+end
+
+function cells_of_face(complex::CellComplex{DMT,SparseMatrixCSC{Int,Int}}, face::Int) where {DMT}
+    return view(rowvals(complex.E2), nzrange(complex.E2, face))
+end
 
 struct SubComplex{DMT,SMT,V}
     parent::CellComplex{DMT,SMT}
@@ -46,7 +72,7 @@ function boundary_faces(complex::CellComplex)
 end
 
 function get_boundary(complex::CellComplex)
-    volume_sub = falses(n_volumes(complex))
+    volume_sub = falses(n_cells(complex))
     face_sub = boundary_faces(complex)
     edge_sub = (complex.E1T * face_sub) .> 0
     vertex_sub = (complex.E0T * edge_sub) .> 0

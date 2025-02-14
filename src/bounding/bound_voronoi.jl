@@ -74,7 +74,7 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
         i += 1
     end
 
-    E0_new = hcat(dropzeros(unbounded_voronoi.E0), sparse(edge_indices, collect(1:N_new_edges), ones(N_new_edges), n_edges(unbounded_voronoi), N_new_edges))
+    E0_new = hcat(dropzeros(unbounded_voronoi.E0), sparse(edge_indices, collect(1:N_new_edges), ones(Int, N_new_edges), n_edges(unbounded_voronoi), N_new_edges))
     vertices_new::DMT = hcat(unbounded_voronoi.vertices, new_points)
 
     extant_indices = vcat(pruned_voronoi.vertex_sub, trues(N_new_edges))
@@ -92,8 +92,8 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
     N_new_face_edges = sum(open_faces)
     new_face_cols = 1:N_new_face_edges
     extant_edges = vcat(extant_edges, trues(N_new_face_edges))
-    E0_new = vcat(E0_new, sparse(repeat(1:N_new_face_edges, inner=2), rowvals(dangling_vertices), ones(2N_new_face_edges), N_new_face_edges, size(E0_new, 2)))
-    E1_new = hcat(unbounded_voronoi.E1, sparse(findall(open_faces), new_face_cols, ones(N_new_face_edges), n_faces(unbounded_voronoi), N_new_face_edges))
+    E0_new = vcat(E0_new, sparse(repeat(1:N_new_face_edges, inner=2), rowvals(dangling_vertices), ones(Int, 2N_new_face_edges), N_new_face_edges, size(E0_new, 2)))
+    E1_new = hcat(unbounded_voronoi.E1, sparse(findall(open_faces), new_face_cols, ones(Int, N_new_face_edges), n_faces(unbounded_voronoi), N_new_face_edges))
 
     # Finally, draw some ray out from Delaunay boundary vertices (Voronoi generators) to ∂Ω, making a point p
     # Use p and those edges only incident to one face to close open cells with triangles
@@ -112,7 +112,7 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
     cell_row = Vector{Int}()
 
     # new_face_rows
-    for c in 1:n_volumes(unbounded_voronoi)
+    for c in 1:n_cells(unbounded_voronoi)
         if !open_cells[c]
             continue
         end
@@ -120,10 +120,10 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
         vertices_to_close = view(rowvals(dangling_vertices), nzrange(dangling_vertices, c))
         edges_to_close = view(rowvals(dangling_edges), nzrange(dangling_edges, c))
         # First, compute mean out towards surface direction 
-        init = SVector{3}(unbounded_voronoi.cell_centers[1, c], unbounded_voronoi.cell_centers[2, c], unbounded_voronoi.cell_centers[3, c])
-        dir = zero(SVector{3})
+        init = SVector{3, Float64}(unbounded_voronoi.cell_centers[1, c], unbounded_voronoi.cell_centers[2, c], unbounded_voronoi.cell_centers[3, c])
+        dir = zero(SVector{3, Float64})
         for v::Int in vertices_to_close
-            dir += SVector{3}(vertices_new[1, v], vertices_new[2, v], vertices_new[3, v])
+            dir += SVector{3, Float64}(vertices_new[1, v], vertices_new[2, v], vertices_new[3, v])
         end
         dir = (dir / length(vertices_to_close)) - init
         dir /= norm(dir)
@@ -166,20 +166,20 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
         i += 1
     end
 
-    E0_closing = sparse(repeat(1:N_new_surface_edges, inner=2), new_edge_cols, ones(length(new_edge_cols)), N_new_surface_edges, N_new_surface_points + size(vertices_new, 2))
-    E1_closing = sparse(repeat(1:N_new_surface_edges, inner=3), new_face_cols, ones(length(new_face_cols)), N_new_surface_edges, N_new_surface_edges + size(E1_new, 2))
+    E0_closing = sparse(repeat(1:N_new_surface_edges, inner=2), new_edge_cols, ones(Int, length(new_edge_cols)), N_new_surface_edges, N_new_surface_points + size(vertices_new, 2))
+    E1_closing = sparse(repeat(1:N_new_surface_edges, inner=3), new_face_cols, ones(Int, length(new_face_cols)), N_new_surface_edges, N_new_surface_edges + size(E1_new, 2))
 
     E0_new = vcat(
-        hcat(E0_new, spzeros(size(E0_new, 1), N_new_surface_points)),
+        hcat(E0_new, spzeros(Int, size(E0_new, 1), N_new_surface_points)),
         E0_closing
     )
 
     E1_new = vcat(
-        hcat(E1_new, spzeros(size(E1_new, 1), N_new_surface_edges)),
+        hcat(E1_new, spzeros(Int, size(E1_new, 1), N_new_surface_edges)),
         E1_closing
     )
 
-    E2_new = hcat(unbounded_voronoi.E2, sparse(cell_row, 1:N_new_surface_edges, ones(N_new_surface_edges), n_volumes(unbounded_voronoi), N_new_surface_edges))
+    E2_new = hcat(unbounded_voronoi.E2, sparse(cell_row, 1:N_new_surface_edges, ones(Int, N_new_surface_edges), n_cells(unbounded_voronoi), N_new_surface_edges))
 
     extant_indices = vcat(extant_indices, trues(N_new_surface_points))
     extant_edges = vcat(extant_edges, trues(N_new_surface_edges))
@@ -187,13 +187,17 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
 
     vertices_new = hcat(vertices_new, new_surface_points)
 
+    # @show typeof(E0_new)
+    # @show typeof(E1_new)
+    # @show typeof(E2_new)
+
     return CellComplex{DMT,SMT}(
         vertices_new[:, extant_indices], unbounded_voronoi.cell_centers,
         E0_new[extant_edges, extant_indices], E1_new[extant_faces, extant_edges], E2_new[:, extant_faces]
     )
 end
 
-function bounded_voronoi(points::DMT, Ω::F; SMT=SparseMatrixCSC) where {DMT,F}
+function bounded_voronoi(points::DMT, Ω::F; SMT=SparseMatrixCSC{Int,Int}) where {DMT,F}
     extended_points = hcat([1000*maximum(points) 0 0 0; 0 1000*maximum(points) 0 0; 0 0 1000*maximum(points) 0], points)
     t = delaunay_tet(extended_points)
 
@@ -202,3 +206,5 @@ function bounded_voronoi(points::DMT, Ω::F; SMT=SparseMatrixCSC) where {DMT,F}
 
     return bound_voronoi(dense_voronoi, dense_delaunay, Ω)
 end
+
+## CAN GET ISSUES WHERE POINTS LEAVE A NON-CONVEX DOMAIN, NEED TO PERFORM A PROJECTION or LINESEARCH TO KEEP THEM IN

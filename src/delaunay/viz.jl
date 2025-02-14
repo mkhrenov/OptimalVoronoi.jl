@@ -10,7 +10,7 @@ function viz!(complex::CellComplex{DMT,SMT}; edge_color=:green) where {DMT,SMT}
     scatter!(complex.vertices)
     scatter!(complex.cell_centers)
 
-    cell_colors = [RGBf(rand(3)...) for _ in 1:n_volumes(complex)]
+    cell_colors = [RGBf(rand(3)...) for _ in 1:n_cells(complex)]
 
     segment = zeros(3, 2)
     rowvec = rowvals(complex.E0T)

@@ -12,7 +12,7 @@ struct DelaunaySimplex{DIM}
     function DelaunaySimplex{4}(v1::Int, v2::Int, v3::Int, v4::Int)
         neighbors = Vector{DelaunaySimplex{4}}(undef, 4)
 
-        simplex = new{4}((v1, v2, v3, v4), neighbors)
+        simplex::DelaunaySimplex{4} = new{4}(tuple(v1, v2, v3, v4), neighbors)
         simplex.neighbors[1] = simplex
         simplex.neighbors[2] = simplex
         simplex.neighbors[3] = simplex

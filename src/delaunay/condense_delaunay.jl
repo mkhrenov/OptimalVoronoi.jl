@@ -1,4 +1,4 @@
-function condense_delaunay(root_simplex::DelaunaySimplex{DIM}, vertices::DMT; SMT=SparseMatrixCSC) where {DIM,DMT}
+function condense_delaunay(root_simplex::DelaunaySimplex{DIM}, vertices::DMT; SMT=SparseMatrixCSC{Int,Int}) where {DIM,DMT}
     simplex_list, simplex_map = enumerate_simplices(root_simplex)
     face_list, face_map, volumes_to_faces = enumerate_faces(simplex_list, simplex_map)
     edge_list, edge_map, faces_to_edges = enumerate_edges(face_list, face_map)
@@ -41,7 +41,11 @@ function enumerate_simplices(simplex::DelaunaySimplex{DIM}) where {DIM}
 
         if !(1 in current.vertices || 2 in current.vertices || 3 in current.vertices || 4 in current.vertices)
             i += 1
-            simp = tuple([v - 4 for v in current.vertices]...)
+            simp = tuple(
+                current.vertices[1] - 4,
+                current.vertices[2] - 4,
+                current.vertices[3] - 4,
+                current.vertices[4] - 4)
             simplex_map[simp] = i
             push!(simplex_list, simp)
         end
@@ -78,7 +82,7 @@ function enumerate_faces(simplex_list::Vector{NTuple{DIM,Int}}, simplex_map::Dic
                     temp_face_vec[3] = simplex[k]
 
                     sort!(temp_face_vec)
-                    face = NTuple{3,Int}(temp_face_vec)
+                    face = tuple(temp_face_vec[1], temp_face_vec[2], temp_face_vec[3])::NTuple{3,Int}
 
                     if !haskey(face_map, face)
                         idx += 1
