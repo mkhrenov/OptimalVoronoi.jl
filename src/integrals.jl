@@ -138,63 +138,120 @@ function face_centroid(complex::CellComplex{DMT,SMT}, face::Int) where {DMT,SMT}
     return face_centr / area
 end
 
-# # Integrals of arbitrary functions
-# # function complex_centroids!(centroids::DMT, complex::CellComplex{DMT,SMT}) where {DMT,SMT}
-# #     _, N = size(centroids)
-# #     @assert N == n_volumes(complex)
+# Integrals of arbitrary functions
 
-# #     for i in 1:N
-# #         centr, vol = cell_centroid(complex, i)
-# #         centroids[:, i] .= centr
-# #     end
-# # end
+function cell_volume_integral(complex::CellComplex{DMT,SMT}, α::K, cell::Int) where {DMT,SMT,K}
+    faces_in_cell = view(rowvals(complex.E2T), nzrange(complex.E2T, cell))
+    total = zero(α(view(complex.cell_centers, :, cell)))
 
-# function cell_integral(complex::CellComplex{DMT,SMT}, Ω::F, α::K, cell::Int) where {DMT,SMT,F,K}
-#     faces_in_cell = view(rowvals(complex.E2T), nzrange(complex.E2T, cell))
-#     total = zero(0)
+    for face in faces_in_cell
+        total += cone_volume_integral(complex, α, cell, face)
+    end
 
-#     for face in faces_in_cell
-#         total += frustum_integral(complex, Ω, α, cell, face)
-#     end
+    return total
+end
 
-#     return total
-# end
+function cone_volume_integral(complex::CellComplex{DMT,SMT}, α::K, cell::Int, face::Int) where {DMT,SMT,K}
+    fc = face_centroid(complex, face)
+    total = zero(α(view(complex.cell_centers, :, cell)))
 
-# function frustum_integral(complex::CellComplex{DMT,SMT}, Ω::F, α::K, cell::Int, face::Int) where {DMT,SMT,F,K}
-#     fc = face_centroid(complex, face)
-#     total = zero(0)
+    edges_in_face = view(rowvals(complex.E1T), nzrange(complex.E1T, f))
 
-#     edges_in_face = view(rowvals(complex.E1T), nzrange(complex.E1T, f))
+    for e in edges_in_face
+        edge_vertices = view(rowvals(complex.E0T), nzrange(complex.E0T, e))
 
-#     for e in edges_in_face
-#         edge_vertices = view(rowvals(complex.E0T), nzrange(complex.E0T, e))
+        total += tetrahedron_volume_integral(
+            view(complex.vertices, :, edge_vertices[1]),
+            view(complex.vertices, :, edge_vertices[2]),
+            fc,
+            view(complex.cell_centers, :, cell),
+            α
+        )
+    end
 
-#         total += simplex_integral(
-#             view(complex.vertices, :, edge_vertices[1]),
-#             view(complex.vertices, :, edge_vertices[2]),
-#             fc,
-#             view(complex.cell_centers, :, cell),
-#             Ω, α
-#         )
-#     end
+    return total
+end
 
-#     return total
-# end
+function tetrahedron_volume_integral(a, b, c, d, α::K; N=10) where {K}
+    a_v = SVector{3}(a[1], a[2], a[3])
+    b_v = SVector{3}(b[1], b[2], b[3])
+    c_v = SVector{3}(c[1], c[2], c[3])
+    d_v = SVector{3}(d[1], d[2], d[3])
 
-# function tetrahedron_integral(a, b, c, d, Ω::F, α::K) where {F,K}
-#     av = SVector{3}(a[1], a[2], a[3])
-#     bv = SVector{3}(b[1], b[2], b[3])
-#     cv = SVector{3}(c[1], c[2], c[3])
-#     dv = SVector{3}(d[1], d[2], d[3])
+    v1 = a_v - d_v
+    v2 = b_v - d_v
+    v3 = c_v - d_v
 
-# end
+    du = 1 / N
+    dv = 1 / N
+    dw = 1 / N
+    dA = abs(det(hcat(v1, v2, v3))) / (N - 1) / N / (N + 1)
 
-# function triangle_integral(a, b, c, Ω::F, α::K) where {F,K}
-#     av = SVector{3}(a[1], a[2], a[3])
-#     bv = SVector{3}(b[1], b[2], b[3])
-#     cv = SVector{3}(c[1], c[2], c[3])
+    total = zero(α(a_v))
 
-#     u = av - cv
-#     v = bv - cv
+    for u in 0:(N-1)
+        for v in 1:(N-u)
+            for w in 1:(N-u-v)
+                p = u * du * v1 + v * dv * v2 + w * dw * v3 + d_v
+                total += α(p) * dA
+            end
+        end
+    end
 
-# end
+    return total
+end
+
+function cell_surface_integral(complex::CellComplex{DMT,SMT}, α::K, cell::Int) where {DMT,SMT,K}
+    faces_in_cell = view(rowvals(complex.E2T), nzrange(complex.E2T, cell))
+    total = zero(α(view(complex.cell_centers, :, cell)))
+
+    for face in faces_in_cell
+        total += cone_surface_integral(complex, α, cell, face)
+    end
+
+    return total
+end
+
+function cone_surface_integral(complex::CellComplex{DMT,SMT}, α::K, cell::Int, face::Int) where {DMT,SMT,K}
+    fc = face_centroid(complex, face)
+    total = zero(α(view(complex.cell_centers, :, cell)))
+
+    edges_in_face = view(rowvals(complex.E1T), nzrange(complex.E1T, f))
+
+    for e in edges_in_face
+        edge_vertices = view(rowvals(complex.E0T), nzrange(complex.E0T, e))
+
+        total += triangle_surface_integral(
+            view(complex.vertices, :, edge_vertices[1]),
+            view(complex.vertices, :, edge_vertices[2]),
+            fc,
+            α
+        )
+    end
+
+    return total
+end
+
+function triangle_surface_integral(a, b, c, α::K; N=10) where {K}
+    av = SVector{3}(a[1], a[2], a[3])
+    bv = SVector{3}(b[1], b[2], b[3])
+    cv = SVector{3}(c[1], c[2], c[3])
+
+    v1 = av - cv
+    v2 = bv - cv
+
+    du = 1 / N
+    dv = 1 / N
+    dA = norm(v1 × v2) / N / (N + 1)
+
+    total = zero(α(a_v))
+
+    for u in 0:(N-1)
+        for v in 1:(N-u)
+            p = u * du * v1 + v * dv * v2 + cv
+            total += α(p) * dA
+        end
+    end
+
+    return total
+end
