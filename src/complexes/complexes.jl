@@ -23,6 +23,8 @@ struct CellComplex{DMT,SMT}
     end
 end
 
+include("integrals.jl")
+
 n_verts(complex::CellComplex) = size(complex.vertices, 2)
 n_edges(complex::CellComplex) = size(complex.E0, 1)
 n_faces(complex::CellComplex) = size(complex.E1, 1)

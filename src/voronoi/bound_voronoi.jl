@@ -120,10 +120,10 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
         vertices_to_close = view(rowvals(dangling_vertices), nzrange(dangling_vertices, c))
         edges_to_close = view(rowvals(dangling_edges), nzrange(dangling_edges, c))
         # First, compute mean out towards surface direction 
-        init = SVector{3, Float64}(unbounded_voronoi.cell_centers[1, c], unbounded_voronoi.cell_centers[2, c], unbounded_voronoi.cell_centers[3, c])
-        dir = zero(SVector{3, Float64})
+        init = SVector{3,Float64}(unbounded_voronoi.cell_centers[1, c], unbounded_voronoi.cell_centers[2, c], unbounded_voronoi.cell_centers[3, c])
+        dir = zero(SVector{3,Float64})
         for v::Int in vertices_to_close
-            dir += SVector{3, Float64}(vertices_new[1, v], vertices_new[2, v], vertices_new[3, v])
+            dir += SVector{3,Float64}(vertices_new[1, v], vertices_new[2, v], vertices_new[3, v])
         end
         dir = (dir / length(vertices_to_close)) - init
         dir /= norm(dir)
@@ -187,10 +187,6 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
 
     vertices_new = hcat(vertices_new, new_surface_points)
 
-    # @show typeof(E0_new)
-    # @show typeof(E1_new)
-    # @show typeof(E2_new)
-
     return CellComplex{DMT,SMT}(
         vertices_new[:, extant_indices], unbounded_voronoi.cell_centers,
         E0_new[extant_edges, extant_indices], E1_new[extant_faces, extant_edges], E2_new[:, extant_faces]
@@ -198,7 +194,7 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
 end
 
 function bounded_voronoi(points::DMT, Ω::F; SMT=SparseMatrixCSC{Int,Int}) where {DMT,F}
-    extended_points = hcat([1000*maximum(points) 0 0 0; 0 1000*maximum(points) 0 0; 0 0 1000*maximum(points) 0], points)
+    extended_points = hcat([1000*maximum(points) 0.0 0.0 0.0; 0.0 1000*maximum(points) 0.0 0.0; 0.0 0.0 1000*maximum(points) 0.0], points)
     t = delaunay_tet(extended_points)
 
     r, dense_delaunay = condense_delaunay(t, extended_points; SMT=SMT)
@@ -206,5 +202,3 @@ function bounded_voronoi(points::DMT, Ω::F; SMT=SparseMatrixCSC{Int,Int}) where
 
     return bound_voronoi(dense_voronoi, dense_delaunay, Ω)
 end
-
-## CAN GET ISSUES WHERE POINTS LEAVE A NON-CONVEX DOMAIN, NEED TO PERFORM A PROJECTION or LINESEARCH TO KEEP THEM IN
