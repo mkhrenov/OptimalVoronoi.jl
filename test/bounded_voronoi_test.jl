@@ -2,10 +2,8 @@ using WeightedCVT
 using SparseArrays
 using GLMakie
 
-sdf = zeros(20, 20, 20)
-for cidx in CartesianIndices(sdf)
-    sdf[cidx] = √((cidx[1] - 10)^2 + (cidx[2] - 10)^2 + (cidx[3] - 10)^2) - 8
-end
+sdf = ones(20, 20, 20) * Inf
+WeightedCVT.sdf_sphere!(sdf, 10, 10, 10, 8)
 Ω = WeightedCVT.Ω_from_array(sdf)
 
 points = 8 .* rand(3, 25) .+ 6

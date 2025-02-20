@@ -35,6 +35,3 @@ voronoi.vertices .-= 0.5
 voronoi.cell_centers .-= 0.5
 WeightedCVT.viz(voronoi)
 volume!(sdf, algorithm=:iso, isovalue=0, isorange=0.1, alpha=0.1)
-
-# bd = WeightedCVT.get_boundary(voronoi)
-# WeightedCVT.viz(bd)
