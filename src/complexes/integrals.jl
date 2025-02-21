@@ -25,7 +25,6 @@ function cell_centroid(complex::CellComplex{DMT,SMT}, cell::Int) where {DMT,SMT}
     cell_centroid = zero(SVector{3,Float64})
     vol = 0.0
 
-    rv_f = rowvals(complex.E2T)
     for face in faces_of_cell(complex, cell)
         frust_centroid, frust_vol = cone_centroid(complex, cell, face)
 

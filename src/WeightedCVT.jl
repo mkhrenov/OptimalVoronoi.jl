@@ -1,9 +1,14 @@
 module WeightedCVT
 
 using LinearAlgebra
+using Random
 using StaticArrays
 using SparseArrays
-using Random
+
+using MathOptInterface
+using Ipopt
+using ForwardDiff
+
 using CUDA
 
 include("sdf.jl")
