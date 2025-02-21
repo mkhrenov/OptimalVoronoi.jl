@@ -197,7 +197,7 @@ function bounded_voronoi(points::DMT, Ω::F; SMT=SparseMatrixCSC{Int,Int}) where
     extended_points = hcat([1000*maximum(points) 0.0 0.0 0.0; 0.0 1000*maximum(points) 0.0 0.0; 0.0 0.0 1000*maximum(points) 0.0], points)
     t = delaunay_tet(extended_points)
 
-    r, dense_delaunay = condense_delaunay(t, extended_points; SMT=SMT)
+    dense_delaunay = condense_delaunay(t, extended_points; SMT=SMT)
     dense_voronoi = dual_complex(dense_delaunay)
 
     return bound_voronoi(dense_voronoi, dense_delaunay, Ω)

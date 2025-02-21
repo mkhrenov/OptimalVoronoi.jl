@@ -15,12 +15,11 @@ function condense_delaunay(root_simplex::DelaunaySimplex{DIM}, vertices::DMT; SM
     E0 = SMT(adjacency_list_to_incidence_matrix(reshape(reinterpret(Int, edge_list), (2, :))', N_vertices))
 
     cell_centers = DMT(undef, 3, N_volumes)
-    r = zeros(N_volumes)
     for (i, simplex) in enumerate(simplex_list)
-        r[i] = circumcenter!(view(cell_centers, :, i), simplex, reduced_vertices)
+        circumcenter!(view(cell_centers, :, i), simplex, reduced_vertices)
     end
 
-    return r, CellComplex{DMT,SMT}(
+    return CellComplex{DMT,SMT}(
         reduced_vertices, cell_centers,
         E0, E1, E2)
 end

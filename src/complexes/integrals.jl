@@ -141,7 +141,7 @@ end
 
 function cell_volume_integral(complex::CellComplex{DMT,SMT}, α::K, cell::Int) where {DMT,SMT,K}
     faces_in_cell = view(rowvals(complex.E2T), nzrange(complex.E2T, cell))
-    total = zero(α(view(complex.cell_centers, :, cell)))
+    total = zero(α(SVector{3}(complex.cell_centers[1, cell], complex.cell_centers[2, cell], complex.cell_centers[3, cell],)))
 
     for face in faces_in_cell
         total += cone_volume_integral(complex, α, cell, face)
@@ -152,7 +152,7 @@ end
 
 function cone_volume_integral(complex::CellComplex{DMT,SMT}, α::K, cell::Int, face::Int) where {DMT,SMT,K}
     fc = face_centroid(complex, face)
-    total = zero(α(view(complex.cell_centers, :, cell)))
+    total = zero(α(SVector{3}(complex.cell_centers[1, cell], complex.cell_centers[2, cell], complex.cell_centers[3, cell],)))
 
     for e in edges_of_face(complex, face)
         edge_vertices = view(rowvals(complex.E0T), nzrange(complex.E0T, e))
@@ -200,7 +200,7 @@ end
 
 function cell_surface_integral(complex::CellComplex{DMT,SMT}, α::K, cell::Int) where {DMT,SMT,K}
     faces_in_cell = view(rowvals(complex.E2T), nzrange(complex.E2T, cell))
-    total = zero(α(view(complex.cell_centers, :, cell)))
+    total = zero(α(SVector{3}(complex.cell_centers[1, cell], complex.cell_centers[2, cell], complex.cell_centers[3, cell],)))
 
     for face in faces_in_cell
         total += face_surface_integral(complex, α, face)

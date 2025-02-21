@@ -5,7 +5,7 @@ using Profile
 using Random
 
 sdf = ones(30, 40, 30) * Inf
-WeightedCVT.sdf_box!(sdf, 15, 20, 10, 24, 36, 10)
+# WeightedCVT.sdf_box!(sdf, 15, 20, 10, 24, 36, 10)
 WeightedCVT.sdf_sphere!(sdf, 15, 16, 15, 8)
 WeightedCVT.sdf_sphere!(sdf, 15, 18, 15, 8)
 WeightedCVT.sdf_sphere!(sdf, 15, 20, 15, 8)
