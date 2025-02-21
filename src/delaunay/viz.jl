@@ -1,16 +1,21 @@
 # Visualization
 
-function viz(complex::CellComplex{DMT,SMT}; edge_color=:green) where {DMT,SMT}
+function viz(complex::CellComplex{DMT,SMT}; edge_color=:green, cell_colors=nothing) where {DMT,SMT}
     fig = Figure()
     lscene = LScene(fig[1, 1])
-    viz!(complex; edge_color=edge_color)
+    viz!(complex; edge_color=edge_color, cell_colors=cell_colors)
 end
 
-function viz!(complex::CellComplex{DMT,SMT}; edge_color=:green) where {DMT,SMT}
+function viz!(complex::CellComplex{DMT,SMT}; edge_color=:green, cell_colors=nothing) where {DMT,SMT}
     scatter!(complex.vertices)
     scatter!(complex.cell_centers)
 
-    cell_colors = [RGBf(rand(3)...) for _ in 1:n_cells(complex)]
+    if isnothing(cell_colors)
+        cell_colors = [RGBf(rand(3)...) for _ in 1:n_cells(complex)]
+    else
+        cell_colors = floor.(Int, 256 .* (cell_colors .- minimum(cell_colors)) ./ (maximum(cell_colors) + 0.01 - minimum(cell_colors))) .+ 1
+        cell_colors = cgrad(:default; alpha=0.5)[cell_colors]
+    end
 
     segment = zeros(3, 2)
     rowvec = rowvals(complex.E0T)

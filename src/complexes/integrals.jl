@@ -40,7 +40,7 @@ function cone_volume(complex::CellComplex{DMT,SMT}, cell::Int, face::Int) where 
     fc = face_centroid(complex, face)
     vol = 0.0
 
-    for e in edges_of_face(complex, face)
+    for edge in edges_of_face(complex, face)
         edge_vertices = verts_of_edge(complex, edge)
         e1::Int = edge_vertices[1]
         e2::Int = edge_vertices[2]
@@ -155,9 +155,7 @@ function cone_volume_integral(complex::CellComplex{DMT,SMT}, α::K, cell::Int, f
     fc = face_centroid(complex, face)
     total = zero(α(view(complex.cell_centers, :, cell)))
 
-    edges_in_face = view(rowvals(complex.E1T), nzrange(complex.E1T, f))
-
-    for e in edges_in_face
+    for e in edges_of_face(complex, face)
         edge_vertices = view(rowvals(complex.E0T), nzrange(complex.E0T, e))
 
         total += tetrahedron_volume_integral(
@@ -206,20 +204,18 @@ function cell_surface_integral(complex::CellComplex{DMT,SMT}, α::K, cell::Int) 
     total = zero(α(view(complex.cell_centers, :, cell)))
 
     for face in faces_in_cell
-        total += cone_surface_integral(complex, α, cell, face)
+        total += face_surface_integral(complex, α, face)
     end
 
     return total
 end
 
-function cone_surface_integral(complex::CellComplex{DMT,SMT}, α::K, cell::Int, face::Int) where {DMT,SMT,K}
+function face_surface_integral(complex::CellComplex{DMT,SMT}, α::K, face::Int) where {DMT,SMT,K}
     fc = face_centroid(complex, face)
-    total = zero(α(view(complex.cell_centers, :, cell)))
+    total = zero(α(view(complex.cell_centers, :, 1)))
 
-    edges_in_face = view(rowvals(complex.E1T), nzrange(complex.E1T, f))
-
-    for e in edges_in_face
-        edge_vertices = view(rowvals(complex.E0T), nzrange(complex.E0T, e))
+    for edge in edges_of_face(complex, face)
+        edge_vertices = verts_of_edge(complex, edge)
 
         total += triangle_surface_integral(
             view(complex.vertices, :, edge_vertices[1]),
@@ -233,12 +229,12 @@ function cone_surface_integral(complex::CellComplex{DMT,SMT}, α::K, cell::Int, 
 end
 
 function triangle_surface_integral(a, b, c, α::K; N=10) where {K}
-    av = SVector{3}(a[1], a[2], a[3])
-    bv = SVector{3}(b[1], b[2], b[3])
-    cv = SVector{3}(c[1], c[2], c[3])
+    a_v = SVector{3}(a[1], a[2], a[3])
+    b_v = SVector{3}(b[1], b[2], b[3])
+    c_v = SVector{3}(c[1], c[2], c[3])
 
-    v1 = av - cv
-    v2 = bv - cv
+    v1 = a_v - c_v
+    v2 = b_v - c_v
 
     du = 1 / N
     dv = 1 / N
@@ -248,7 +244,7 @@ function triangle_surface_integral(a, b, c, α::K; N=10) where {K}
 
     for u in 0:(N-1)
         for v in 1:(N-u)
-            p = u * du * v1 + v * dv * v2 + cv
+            p = u * du * v1 + v * dv * v2 + c_v
             total += α(p) * dA
         end
     end

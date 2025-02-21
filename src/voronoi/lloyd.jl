@@ -1,8 +1,8 @@
 function lloyd(points::DMT, Ω::F; SMT=SparseMatrixCSC{Int,Int}, tol=2e-2, max_iters=1000) where {DMT,F}
-    centroids = zeros(size(points))
+    centroids = DMT(zeros(size(points)))
     next_points = copy(centroids)
-    sdf = zeros(1, size(points, 2))
-    α = ones(1, size(points, 2))
+    sdf = DMT(zeros(1, size(points, 2)))
+    α = DMT(ones(1, size(points, 2)))
     voronoi = bounded_voronoi(points, Ω; SMT=SMT)
 
     for k in 1:max_iters
