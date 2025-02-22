@@ -1,63 +1,38 @@
-function minimum_variance_voronoi(points::DMT, Ω::F, u::G; SMT=SparseMatrixCSC{Int,Int}, tol=1e-3, η=1.0, max_iters=1000) where {DMT,F,G}
-    gradient = DMT(zeros(size(points)))
-    centroids = DMT(zeros(size(points)))
-    averages = DMT(zeros(1, size(points, 2)))
-    next_points = copy(points)
+function minimum_variance_voronoi(points::DMT, Ω::F, u::G; tol=1e-3, max_iters=1000, α=1.0) where {DMT,F,G}
+    n = size(points, 2)
+    z₀ = vec(points)
+    ū = zeros(1, n)
 
-    sdf = DMT(zeros(1, size(points, 2)))
+    f(complex) = cumulative_error(complex, u, ū)
+    g!(g, z, voronoi) = variance_gradient!(g, ū, z, voronoi, u)
+    c! = eval_cvt_constraint!
 
-    voronoi = bounded_voronoi(points, Ω; SMT=SMT)
-    α = η
+    optimal_points = reshape(optimize_voronoi(f, g!, c!, Ω, z₀, 3n, n; tol=tol, max_iters=max_iters, α=α), 3, :)
 
-    err = cumulative_error(voronoi, u, averages)
-    for k in 1:max_iters
-        complex_centroids!(centroids, voronoi)
-        variance_gradient!(gradient, averages, voronoi, u)
-        gradient .+= (points .- centroids) .* 0.01
-        @show err = cumulative_error(voronoi, u, averages)
-
-        @show maximum(abs, gradient)
-        if maximum(abs, gradient) < tol
-            println("Minimum Variance Voronoi took $k iterations")
-            break
-        end
-
-        @. next_points = points - α * gradient
-        map!(Ω, sdf, eachslice(next_points, dims=2))
-        while maximum(sdf) ≥ -0.01 #|| err - cumulative_error(bounded_voronoi(next_points, Ω; SMT=SMT), u) < dot(gradient, gradient) * α * 1e-5
-            α *= 0.8
-            @. next_points = points - α * gradient
-            map!(Ω, sdf, eachslice(next_points, dims=2))
-        end
-        α = clamp(α * 1.2, 1e-12, η)
-
-        @show maximum(sdf)
-        @show α
-
-        points .= next_points
-        voronoi = bounded_voronoi(points, Ω; SMT=SMT)
-        if α < 1e-11
-            break
-        end
-    end
-
-    @show gradient
-
-    return voronoi
+    return bounded_voronoi(optimal_points, Ω)
 end
 
-function variance_gradient!(gradient::DMT, ū::DMT, voronoi::CellComplex{DMT,SMT}, u::G) where {DMT,SMT,G}
+function variance_gradient!(gradient, ū::DMT, z, voronoi::CellComplex{DMT,SMT}, u::G) where {DMT,SMT,G}
     cell_averages!(ū, voronoi, u)
     gradient .= 0
+    gm = reshape(gradient, 3, :)
+
+    points = reshape(z, 3, :)
+    complex_centroids!(gm, voronoi)
+    gm .*= -1.0
+    gm .+= points
+    # gm ./= 100.0
 
     for i in 1:n_cells(voronoi)
-        # @show i
+        gm[:, i] .*= 2.0 * cell_volume(voronoi, i) / 6000.0
+    end
+
+    for i in 1:n_cells(voronoi)
         for face in faces_of_cell(voronoi, i)
             for j in cells_of_face(voronoi, face)
                 if i == j
                     continue
                 end
-                # @show j
 
                 x_i = voronoi.cell_centers[:, i]
                 x_j = voronoi.cell_centers[:, j]
@@ -67,7 +42,7 @@ function variance_gradient!(gradient::DMT, ū::DMT, voronoi::CellComplex{DMT,SM
 
                 g(p) = (ū[i]^2 - ū[j]^2 + 2(ū[j] - ū[i]) * u(p)) * (p - x_i) / norm(x_i - x_j)
 
-                gradient[:, i] .+= face_surface_integral(voronoi, g, face)
+                gm[:, i] .+= face_surface_integral(voronoi, g, face)
             end
         end
     end

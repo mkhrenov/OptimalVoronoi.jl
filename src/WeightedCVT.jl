@@ -5,9 +5,11 @@ using Random
 using StaticArrays
 using SparseArrays
 
+using DataStructures
 using ForwardDiff
 
 using CUDA
+# using GLMakie
 
 include("sdf.jl")
 include("optimizer.jl")

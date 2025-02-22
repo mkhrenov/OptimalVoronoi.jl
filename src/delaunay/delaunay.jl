@@ -1,12 +1,7 @@
-using LinearAlgebra
-using StaticArrays
-using DataStructures
-using GLMakie
-
 ##### Data Structures #####
 
 struct DelaunaySimplex{DIM}
-    vertices::NTuple{DIM,Int}
+    vertices::NTuple{DIM, Int}
     neighbors::Vector{DelaunaySimplex{DIM}}
 
     function DelaunaySimplex{4}(v1::Int, v2::Int, v3::Int, v4::Int)
@@ -24,7 +19,7 @@ const DelaunayTet = DelaunaySimplex{4}
 
 Base.show(io::IO, s::DelaunaySimplex) = print(io, "$(s.vertices)")
 
-function simplex_is(s::DelaunaySimplex{DIM}, ps::Vararg{Int,DIM}) where {DIM}
+function simplex_is(s::DelaunaySimplex{DIM}, ps::Vararg{Int, DIM}) where {DIM}
     for p in ps
         if p ∉ s.vertices
             return false
@@ -72,7 +67,7 @@ function walk(σ::DelaunaySimplex{DIM}, p::Int, points) where {DIM}
     return σ
 end
 
-function closertothan(p::Int, n::Int, σ::DelaunayTet, points::PMT) where {T<:Number,PMT<:AbstractMatrix{T}}
+function closertothan(p::Int, n::Int, σ::DelaunayTet, points::PMT) where {T <: Number, PMT <: AbstractMatrix{T}}
     # Find the points that form the interface between n and σ, and the point `q` in σ which is opposite the interface
     v1, v2, v3, q = get_commonface_and_opposite(σ, n)
 
