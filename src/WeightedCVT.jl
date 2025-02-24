@@ -9,7 +9,7 @@ using DataStructures
 using ForwardDiff
 
 using CUDA
-# using GLMakie
+using GLMakie
 
 include("sdf.jl")
 include("optimizer.jl")

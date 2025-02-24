@@ -11,6 +11,16 @@ function complex_centroids!(centroids::DMT, complex::CellComplex{DMT,SMT}) where
     end
 end
 
+function complex_volume(complex::CellComplex{DMT,SMT}) where {DMT,SMT}
+    vol = 0.0
+
+    for cell in 1:n_cells(complex)
+        vol += cell_volume(complex, cell)
+    end
+
+    return vol
+end
+
 function cell_volume(complex::CellComplex{DMT,SMT}, cell::Int) where {DMT,SMT}
     vol = 0.0
 

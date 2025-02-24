@@ -12,21 +12,25 @@ function lloyd(points::DMT, Ω::F; SMT=SparseMatrixCSC{Int,Int}, tol=1e-3, max_i
 end
 
 
-function eval_cvt_objective(complex)
+function eval_cvt_objective(x, Ω::F) where {F}
+    points = reshape(x, 3, :)
+    voronoi = bounded_voronoi(points, Ω)
+
     J = 0.0
     for i in 1:n_cells(voronoi)
-        z_i = SVector{3}(complex.cell_centers[1, i], complex.cell_centers[2, i], complex.cell_centers[3, i])
+        z_i = SVector{3}(voronoi.cell_centers[1, i], voronoi.cell_centers[2, i], voronoi.cell_centers[3, i])
         f(y) = dot(y - z_i, y - z_i)
 
-        J += cell_volume_integral(complex, f, i)
+        J += cell_volume_integral(voronoi, f, i)
     end
 
-    return J / 100.0
+    return J / complex_volume(voronoi)
 end
 
-function eval_cvt_objective_gradient!(grad_f, z, voronoi)
+function eval_cvt_objective_gradient!(grad_f, z, Ω::F) where {F}
     points = reshape(z, 3, :)
     grad_p = reshape(grad_f, 3, :)
+    voronoi = bounded_voronoi(points, Ω)
 
     complex_centroids!(grad_p, voronoi)
     grad_p .*= -1.0
@@ -36,7 +40,7 @@ function eval_cvt_objective_gradient!(grad_f, z, voronoi)
         grad_p[:, i] .*= 2.0 * cell_volume(voronoi, i)
     end
 
-    grad_p ./= 100.0
+    grad_p ./= complex_volume(voronoi)
 end
 
 function eval_cvt_constraint!(c, z, Ω::F) where {F}
