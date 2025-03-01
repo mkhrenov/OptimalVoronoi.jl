@@ -59,6 +59,8 @@ end
 function variance_gradient!(gm, complex::CellComplex, u::G, ū) where {G}
     cell_averages!(ū, complex, u)
 
+    g(p, i, j) = (ū[i]^2 - ū[j]^2 + 2(ū[j] - ū[i]) * u(p)) * (p - @view(complex.cell_centers[:, i]))
+
     for i in 1:n_cells(complex)
         for face in faces_of_cell(complex, i)
             for j in cells_of_face(complex, face)
@@ -72,9 +74,7 @@ function variance_gradient!(gm, complex::CellComplex, u::G, ū) where {G}
                 x_i = SVector{3}(x_i[1], x_i[2], x_i[3])
                 x_j = SVector{3}(x_j[1], x_j[2], x_j[3])
 
-                g(p) = (ū[i]^2 - ū[j]^2 + 2(ū[j] - ū[i]) * u(p)) * (p - x_i) / norm(x_i - x_j)
-
-                gm[:, i] .+= face_surface_integral(complex, g, face)
+                gm[:, i] .+= face_surface_integral(complex, (p) -> g(p, i, j), face) / norm(x_i - x_j)
             end
         end
     end

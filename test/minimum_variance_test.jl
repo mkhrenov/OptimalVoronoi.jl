@@ -16,16 +16,11 @@ WeightedCVT.sdf_sphere!(sdf, 15, 24, 15, 8)
 Ω = WeightedCVT.Ω_from_array(sdf)
 T(x) = exp(-((x[1] - 15)^2 + (x[2] - 24)^2 + (x[3] - 24)^2) / 5^2)
 
-points = WeightedCVT.sample_from_discrete_sdf(sdf, 500)
+points = WeightedCVT.sample_from_discrete_sdf(sdf, 100)
 
 pcopy = copy(points)
 
 points .= pcopy
-voronoi = WeightedCVT.bounded_voronoi(points, Ω)
-# @show WeightedCVT.cumulative_error(voronoi, T)
-
-@time voronoi = WeightedCVT.lloyd(points, Ω);
-points .= voronoi.cell_centers
 @time voronoi = WeightedCVT.minimum_variance_voronoi(points, Ω, T; max_iters=1000);
 
 # points .= pcopy
@@ -40,6 +35,10 @@ points .= pcopy
 
 voronoi.vertices .-= 0.5
 voronoi.cell_centers .-= 0.5
+
+
 WeightedCVT.viz(voronoi, cell_colors=vec(WeightedCVT.cell_averages(voronoi, T)))
 volume!(sdf, algorithm=:iso, isovalue=0, isorange=0.1, alpha=0.1)
 
+# WeightedCVT.viz(voronoi, cell_colors=vec(WeightedCVT.complex_volumes(voronoi)))
+# volume!(sdf, algorithm=:iso, isovalue=0, isorange=0.1, alpha=0.1)

@@ -21,6 +21,10 @@ function complex_volume(complex::CellComplex{DMT,SMT}) where {DMT,SMT}
     return vol
 end
 
+function complex_volumes(complex::CellComplex{DMT,SMT}) where {DMT,SMT}
+    return map(cell -> cell_volume(complex, cell), 1:n_cells(complex))
+end
+
 function cell_volume(complex::CellComplex{DMT,SMT}, cell::Int) where {DMT,SMT}
     vol = 0.0
 
@@ -221,7 +225,7 @@ end
 
 function face_surface_integral(complex::CellComplex{DMT,SMT}, α::K, face::Int) where {DMT,SMT,K}
     fc = face_centroid(complex, face)
-    total = zero(α(view(complex.cell_centers, :, 1)))
+    total = zero(α(SVector{3}(complex.cell_centers[1, 1], complex.cell_centers[2, 1], complex.cell_centers[3, 1],)))
 
     for edge in edges_of_face(complex, face)
         edge_vertices = verts_of_edge(complex, edge)
