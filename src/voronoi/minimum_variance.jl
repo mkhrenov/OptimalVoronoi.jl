@@ -1,64 +1,36 @@
-function minimum_variance_voronoi(points::DMT, Ω::F, u::G; tol=1e-3, max_iters=1000, α=1.0) where {DMT,F,G}
+function minimum_variance_voronoi(points::DMT, Ω::F, u::G; tol=1e-3, max_iters=1000) where {DMT,F,G}
     n = size(points, 2)
     z₀ = vec(points)
     ū = zeros(1, n)
 
-    f(z, Ω) = cumulative_error(z, Ω, u, ū)
-    g!(g, z, Ω) = variance_gradient!(g, ū, z, Ω, u)
-    c! = eval_cvt_constraint!
+    f(z) = eval_minvar_objective(z, Ω, u, ū)
+    g!(g, z) = eval_minvar_gradient!(g, z, Ω, u, ū)
 
-    optimal_points = reshape(optimize_voronoi(f, g!, c!, Ω, z₀, 3n, n; tol=tol, max_iters=max_iters, α=α), 3, :)
+    o = BFGSOptimizerState(f, g!, Ω, length(z₀); f_abs_tol=1e-8, μ₀=5e-3)
+
+    optimize_voronoi!(o, z₀)
+
+    optimal_points = reshape(o.xₖ₊₁, 3, :)
 
     return bounded_voronoi(optimal_points, Ω)
 end
 
-function variance_gradient!(gradient, ū, z, Ω::F, u::G) where {F,G}
-    points = reshape(z, 3, :)
+function eval_minvar_objective(x, Ω::F, u::G, ū) where {F,G}
+    points = reshape(x, 3, :)
     voronoi = bounded_voronoi(points, Ω)
-    cell_averages!(ū, voronoi, u)
-    gradient .= 0
-    gm = reshape(gradient, 3, :)
 
-    complex_centroids!(gm, voronoi)
-    gm .*= -1.0
-    gm .+= points
-
-    for i in 1:n_cells(voronoi)
-        gm[:, i] .*= 2.0 * cell_volume(voronoi, i)
-    end
-
-    gm ./= 10.0
-
-    for i in 1:n_cells(voronoi)
-        for face in faces_of_cell(voronoi, i)
-            for j in cells_of_face(voronoi, face)
-                if i == j
-                    continue
-                end
-
-                x_i = voronoi.cell_centers[:, i]
-                x_j = voronoi.cell_centers[:, j]
-
-                x_i = SVector{3}(x_i[1], x_i[2], x_i[3])
-                x_j = SVector{3}(x_j[1], x_j[2], x_j[3])
-
-                g(p) = (ū[i]^2 - ū[j]^2 + 2(ū[j] - ū[i]) * u(p)) * (p - x_i) / norm(x_i - x_j)
-
-                gm[:, i] .+= face_surface_integral(voronoi, g, face)
-            end
-        end
-    end
-
-    gm ./= complex_volume(voronoi)
-    gm .*= 10.0
+    return (5e-5) * cumulative_squared_distance(voronoi) + cumulative_variance(voronoi, u, ū)
 end
 
-function cell_averages!(ū::DMT, complex::CellComplex{DMT,SMT}, u::G) where {DMT,SMT,G}
-    ū .= 0
+function eval_minvar_gradient!(g, x, Ω::F, u::G, ū) where {F,G}
+    gm = reshape(g, 3, :)
+    points = reshape(x, 3, :)
+    voronoi = bounded_voronoi(points, Ω)
 
-    for cell in 1:n_cells(complex)
-        ū[cell] = cell_volume_integral(complex, u, cell) / cell_volume(complex, cell)
-    end
+    cumulative_squared_distance_gradient!(gm, voronoi)
+    gm .*= 5e-5
+
+    variance_gradient!(gm, voronoi, u, ū)
 end
 
 function cell_averages(complex::CellComplex{DMT,SMT}, u::G) where {DMT,SMT,G}
@@ -67,25 +39,43 @@ function cell_averages(complex::CellComplex{DMT,SMT}, u::G) where {DMT,SMT,G}
     return ū
 end
 
-function cumulative_error(complex::CellComplex{DMT,SMT}, u::G) where {DMT,SMT,G}
-    ū = DMT(zeros(1, n_cells(complex)))
-    return cumulative_error(complex, u, ū)
+function cell_averages!(ū, complex::CellComplex{DMT,SMT}, u::G) where {DMT,SMT,G}
+    ū .= 0
+    map!(
+        cell -> cell_volume_integral(complex, u, cell) / cell_volume(complex, cell),
+        ū, 1:n_cells(complex)
+    )
 end
 
-function cumulative_error(z, Ω::F, u::G, ū) where {F,G}
-    acc = 0.0
-    points = reshape(z, 3, :)
-    complex = bounded_voronoi(points, Ω)
+function cumulative_variance(complex::CellComplex, u::G, ū) where {G}
     cell_averages!(ū, complex, u)
 
-    for cell in 1:n_cells(complex)
-        g(x) = (u(x) - ū[cell])^2
-        acc += cell_volume_integral(complex, g, cell)
+    return sum(
+        cell -> cell_volume_integral(complex, x -> (u(x) - ū[cell])^2, cell),
+        1:n_cells(complex)
+    )
+end
+
+function variance_gradient!(gm, complex::CellComplex, u::G, ū) where {G}
+    cell_averages!(ū, complex, u)
+
+    for i in 1:n_cells(complex)
+        for face in faces_of_cell(complex, i)
+            for j in cells_of_face(complex, face)
+                if i == j
+                    continue
+                end
+
+                x_i = complex.cell_centers[:, i]
+                x_j = complex.cell_centers[:, j]
+
+                x_i = SVector{3}(x_i[1], x_i[2], x_i[3])
+                x_j = SVector{3}(x_j[1], x_j[2], x_j[3])
+
+                g(p) = (ū[i]^2 - ū[j]^2 + 2(ū[j] - ū[i]) * u(p)) * (p - x_i) / norm(x_i - x_j)
+
+                gm[:, i] .+= face_surface_integral(complex, g, face)
+            end
+        end
     end
-
-    acc /= complex_volume(complex)
-
-    acc += eval_cvt_objective(z, Ω) / 10.0
-
-    return acc * 10.0
 end

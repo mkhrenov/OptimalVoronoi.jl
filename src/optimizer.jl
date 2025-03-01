@@ -1,206 +1,285 @@
 
-# BFGS optimizer for voronoi tessellations, with line-search to ensure strict feasibility
-function optimize_voronoi(f, g!, c!, Ω::F, x₀, Nx, Nc;
-    tol=1e-3, max_iters=1000, α=1.0, β₁=0.9, β₂=0.999, ϵ=1e-8) where {F}
-    @assert Nx == length(x₀)
+mutable struct BFGSOptimizerState{F,G,C,ST,VT,MT}
+    ρ::ST
+    μ::ST
+    α::ST
+    lim::ST
 
-    α_init = α
+    max_iters::Int
+    verbosity::Int
 
-    xₖ₊₁ = copy(x₀)
-    gₖ₊₁ = zeros(Nx)
-    xₖ = copy(x₀)
-    gₖ = zeros(Nx)
-    xs = copy(x₀)
+    f_abs_tol::ST
+    g_abs_tol::ST
+    f_rel_tol::ST
+    g_rel_tol::ST
 
-    c = zeros(Nc)           # Constraint evaluation
-    y = copy(gₖ)            # Gradient secant
-    p = copy(gₖ)            # Step direction
-    s = copy(gₖ)            # Final step
-    r = copy(y)
+    f::F
+    g!::G
+    Ω::C
 
-    gb = copy(gₖ)
+    fₖ::ST
+    fₖ₊₁::ST
+    xₖ::VT
+    xₖ₊₁::VT
+    gₖ::VT
+    gₖ₊₁::VT
 
-    B = diagm(ones(Nx))      # Approximate Hessian inverse
-    Bk = copy(B)
-    outer_prod1 = zeros(Nx, Nx)
-    outer_prod2 = zeros(Nx, Nx)
+    Bₖ::MT
+    Bₒ::MT
+    o_prod_1::MT
+    o_prod_2::MT
 
-    # Evaluate first gradient
-    points = reshape(xₖ₊₁, 3, :)
-    @show J0 = f(xₖ₊₁, Ω)
-    g!(gₖ₊₁, xₖ₊₁, Ω)
-    penalty_gradient!(gₖ₊₁, c!, c, Ω, xₖ₊₁, 0.1)
-    ρ = 1.0
+    y::VT
+    p::VT
+    s::VT
+    r::VT
 
-    for b in 3.0:0.5:6.0
-        μ = (0.1)^b
-        println("######### $b ##########")
+    function BFGSOptimizerState(
+        f::F, g!::G, Ω::C, Nx; μ₀=0.1, α₀=1.0, max_iters=10_000, verbosity=4,
+        f_abs_tol=1e-6, g_abs_tol=1e-4, f_rel_tol=1e-6, g_rel_tol=1e-4) where {F,G,C}
+        ST = Float64
+        VT = Vector{ST}
+        MT = Matrix{ST}
 
-        B .= 0.0
-        B[diagind(B)] .= 1.0
-        Bk .= B
+        xₖ = zeros(Nx)
+        xₖ₊₁ = zeros(Nx)
+        gₖ = zeros(Nx)
+        gₖ₊₁ = zeros(Nx)
 
-        # Get gradient at xₖ₊₁
-        g!(gₖ₊₁, xₖ₊₁, Ω)
-        penalty_gradient!(gₖ₊₁, c!, c, Ω, xₖ₊₁, μ)
+        Bₖ = zeros(Nx, Nx)
+        Bₒ = zeros(Nx, Nx)
+        o_prod_1 = zeros(Nx, Nx)
+        o_prod_2 = zeros(Nx, Nx)
 
-        for k in 1:max_iters
-            # Get gradient at xₖ
-            gₖ .= gₖ₊₁
-            xₖ .= xₖ₊₁
+        y = zeros(Nx)
+        p = zeros(Nx)
+        s = zeros(Nx)
+        r = zeros(Nx)
 
-            if maximum(abs, gₖ) < tol
-                break
-            end
-
-            # Solve for direction pₖ
-            B .+= B'
-            B ./= 2.0
-            Bk .= B
-            B_factorized = LinearAlgebra.cholesky!(Hermitian(B), check=false)
-
-            if !issuccess(B_factorized)
-                B .= Bk
-                B .= 0.0
-                B[diagind(B)] .+= ρ
-                # @show ρ
-                ρ *= 2.0
-                # α = α_init
-                continue
-                # else
-                #     ρ = 1.0
-            end
-
-            ldiv!(p, B_factorized, gₖ)
-            p .*= -1.0
-            B .= Bk
-
-            # Perform line-search to ensure feasibility
-            α = linesearch(α, f, g!, c!, c, Ω, p, xₖ, xs, gₖ, gb, μ, J0)
-
-            if α < 0.0
-                B .= 0.0
-                B[diagind(B)] .+= ρ
-                @show ρ
-                ρ *= 2.0
-                α = α_init
-                continue
-            else
-                ρ = 1.0
-            end
-
-            # @show α
-            # Update iterate
-            @. s = α * p
-            @. xₖ₊₁ = xₖ + s
-
-            # Get gradient at xₖ₊₁, compute secant
-            g!(gₖ₊₁, xₖ₊₁, Ω)
-            penalty_gradient!(gₖ₊₁, c!, c, Ω, xₖ₊₁, μ)
-            @. y = gₖ₊₁ - gₖ
-
-            sTy = dot(s, y)
-            sBs = dot(s, B, s)
-            # @show sBs
-            # @show sTy
-
-            # Compute curvature damping
-            θ = (sTy ≥ 0.2 * sBs) ? 1.0 : (0.8 * sBs) / (sBs - sTy)
-            # @show θ
-
-            # Update damped secant
-            # r = θ * y + (1 - θ) * B * s
-            mul!(r, B, s)
-            r .*= (1.0 - θ)
-            r .+= θ .* y
-
-            sTr = dot(s, r)
-
-            # Update Hessian estimate
-            # B = B - (B * s * s' * B) / (s' * B * s) + (r * r') / (s' * r)
-            Bk .= B
-            mul!(outer_prod1, s, s')
-            mul!(outer_prod2, Bk, outer_prod1)
-            mul!(B, outer_prod2, Bk, -1.0 / sBs, 1.0)
-            mul!(B, r, r', 1.0 / sTr, 1.0)
-
-            α = clamp(α * 1.2, 0.0, α_init)
-            println("$(maximum(abs, gₖ₊₁))")#$(round(f(xₖ₊₁), digits=5)), 
-        end
-
+        return new{F,G,C,ST,VT,MT}(
+            0.0, μ₀, α₀, 0.5,
+            max_iters, verbosity,
+            f_abs_tol, g_abs_tol, f_rel_tol, g_rel_tol,
+            f, g!, Ω,
+            0.0, 0.0,
+            xₖ, xₖ₊₁, gₖ, gₖ₊₁,
+            Bₖ, Bₒ, o_prod_1, o_prod_2,
+            y, p, s, r
+        )
     end
-
-    return xₖ
 end
 
-function project_to_volume!(x, Ω::F) where {F}
+function initialize!(o::BFGSOptimizerState, x₀)
+    o.xₖ .= x₀
+    o.xₖ₊₁ .= x₀
+
+    o.fₖ = opt_objective(o, o.xₖ)
+    o.fₖ₊₁ = o.fₖ
+
+    opt_gradient!(o, o.gₖ, o.xₖ)
+    o.gₖ₊₁ .= o.gₖ
+
+    reset_hessian!(o)
+end
+
+function reset_hessian!(o::BFGSOptimizerState)
+    o.ρ = 0.0
+    o.α = 1.0
+    o.Bₖ .= 0.0
+    o.Bₖ[diagind(o.Bₖ)] .= 1.0
+    o.Bₒ .= o.Bₖ
+end
+
+function opt_objective(o::BFGSOptimizerState, x)
+    # Compute main objective
+    obj = o.f(x)
+
+    # Add penalties SDF
     points = reshape(x, 3, :)
-    n_points = size(points, 2)
-    g = zeros(3)
+    for point in eachcol(points)
+        obj -= o.μ * log(o.lim - o.Ω(point))
+    end
 
-    for i in 1:n_points
-        p_i = view(points, :, i)
+    return obj
+end
 
-        while Ω(p_i) > -0.5
-            ForwardDiff.gradient!(g, Ω, p_i)
-            p_i .-= (Ω(p_i) + 0.51) .* g
+function opt_gradient!(o::BFGSOptimizerState, g, x)
+    # Clear gradient
+    g .= 0.0
+
+    # Compute main objective gradient
+    o.g!(g, x)
+
+    # Compute penalty gradient
+    points = reshape(x, 3, :)
+    g_points = reshape(g, 3, :)
+    for (point, g_point) in zip(eachcol(points), eachcol(g_points))
+        g_point .+= (o.μ / (o.lim - o.Ω(point))) .* ForwardDiff.gradient(o.Ω, point)
+    end
+end
+
+function descent_direction!(o::BFGSOptimizerState; max_reg_iter=50, ρₘᵢₙ=1e-10, ρₘₐₓ=1e10)
+    Bₖ = o.Bₖ
+    Bₒ = o.Bₒ
+
+    # Ensure B is symmetric/Hermitian
+    Bₖ .+= Bₖ'
+    Bₖ ./= 2.0
+
+    # Back up Hessian estimate
+    Bₒ .= Bₖ
+
+    for k in 1:max_reg_iter
+        # Add in regularization
+        Bₖ[diagind(Bₖ)] .+= o.ρ
+
+        # Perform Cholesky factorization, don't check for positive definiteness
+        B_factorized = LinearAlgebra.cholesky!(Hermitian(Bₖ), check=false)
+
+        if issuccess(B_factorized)
+            o.ρ = clamp(0.8 * o.ρ, 0.0, ρₘₐₓ)
+
+            # Use factorization to compute descent direction
+            ldiv!(o.p, B_factorized, o.gₖ)
+            o.p .*= -1.0
+
+            break
+        else
+            Bₖ .= Bₒ
+            o.ρ = clamp(1.6 * o.ρ, ρₘᵢₙ, ρₘₐₓ)
         end
     end
+
+    # Restore pre-regularized Hessian estimate
+    Bₖ .= Bₒ
 end
 
-function penalty(c!, c, Ω::F, x, μ) where {F}
-    Nc = length(c)
-    J = 0.0
-    c!(c, x, Ω)
 
-    for i in 1:Nc
-        J -= μ * log(-(c[i] + 0.5))
-    end
-    return J
-end
+function linesearch!(o::BFGSOptimizerState)
+    o.α = clamp(1.5 * o.α, 0.0, 1.0)
 
-function penalty_gradient!(g, c!, c, Ω::F, x, μ) where {F}
-    Nc = length(c)
-    points = reshape(x, 3, :)
-    gm = reshape(g, 3, :)
-    c!(c, x, Ω)
+    while o.α ≥ 1e-8
+        @. o.xₖ₊₁ = o.xₖ + o.α * o.p
 
-    for i in 1:Nc
-        gm[:, i] .-= (μ / (c[i] + 0.5)) * ForwardDiff.gradient(Ω, points[:, i])
-    end
-end
+        points = reshape(o.xₖ₊₁, 3, :)
 
-function linesearch(α, f, g!, c!, c, Ω::F, p, x0, xs, g, gb, μ, J0) where {F}
-    while α ≥ 1e-8
-        @. xs = x0 + α * p
-        c!(c, xs, Ω)
+        if (maximum(o.Ω, eachcol(points)) < -o.lim)
+            o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
 
-        if (maximum(c) < -0.51)
-            if (f(xs, Ω) + penalty(c!, c, Ω, xs, μ) ≤ (f(x0, Ω) + penalty(c!, c, Ω, x0, μ)) * 1.1)# - dot(p, g))  # (1e-4) * (1/α) * 
-
-            g!(gb, xs, Ω)
-            penalty_gradient!(gb, c!, c, Ω, xs, μ)
-
-            # if -dot(p, gb) ≤ -0.9 * dot(p, g)
-            # if dot(gb, gb) ≤ dot(g, g)
-                return α
-            # end
-            # else
-            #     println("Wolfe II violated")
-            # end
-            # else
-            #     println("Wolfe I violated")
-            #     # @show f(xs, Ω) + penalty(c!, c, Ω, xs, μ)
-            #     # @show f(x0, Ω) + penalty(c!, c, Ω, x0, μ) + (1e-4) * α * dot(p, g)
-            #     # throw(ErrorException("Wolfe!"))
+            if (o.fₖ₊₁ ≤ o.fₖ + 1e-4 * o.α * dot(o.p, o.gₖ))
+                @. o.s = o.α * o.p
+                return true
             end
         else
-            println("Overshoot of $(maximum(c)), α=$α")
+            # println("Overshoot of $(maximum(o.Ω, eachcol(points))), α=$(o.α)")
         end
 
-        α *= sqrt(0.1)
+        o.α *= 0.2
     end
-    println("Line-search failed, α: $α")
+    println("Line-search failed, α: $(o.α)")
+    o.α = 1e-10
+    @. o.s = o.α * o.p
+    o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
 
-    return -1.0
+    o.α = 1.0
+    return false
+end
+
+# BFGS optimizer for voronoi tessellations, with line-search to ensure strict feasibility
+function optimize_voronoi!(o::BFGSOptimizerState, x₀)
+    # Initialize from initial guess
+    initialize!(o, x₀)
+
+    for k in 1:o.max_iters
+        # Get gradient at xₖ from previous iteration
+        o.gₖ .= o.gₖ₊₁
+        o.xₖ .= o.xₖ₊₁
+        o.fₖ = o.fₖ₊₁
+
+        # Solve for descent direction pₖ
+        descent_direction!(o)
+
+        # Perform line-search to ensure feasibility and sufficient descent
+        if !linesearch!(o)
+            # println("Resetting hessian")
+            reset_hessian!(o)
+            opt_gradient!(o, o.gₖ, o.xₖ)
+            descent_direction!(o)
+            linesearch!(o)
+        end
+
+        # Iterate updated by linesearch
+
+        # Get gradient at xₖ₊₁, compute secant
+        opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
+        @. o.y = o.gₖ₊₁ - o.gₖ
+
+        sTy = dot(o.s, o.y)
+        sBs = dot(o.s, o.Bₖ, o.s)
+
+        # Compute curvature damping
+        θ = (sTy ≥ 0.2 * sBs) ? 1.0 : (0.8 * sBs) / (sBs - sTy)
+
+        # Update damped secant
+        # r = θ * y + (1 - θ) * B * s
+        mul!(o.r, o.Bₖ, o.s)
+        o.r .*= (1.0 - θ)
+        o.r .+= θ .* o.y
+
+        sTr = dot(o.s, o.r)
+
+        # Update Hessian estimate
+        # B = B - (B * s * s' * B) / (s' * B * s) + (r * r') / (s' * r)
+        o.Bₒ .= o.Bₖ
+        mul!(o.o_prod_1, o.s, o.s')
+        mul!(o.o_prod_2, o.Bₒ, o.o_prod_1)
+        mul!(o.Bₖ, o.o_prod_2, o.Bₒ, -1.0 / sBs, 1.0)
+        mul!(o.Bₖ, o.r, o.r', 1.0 / sTr, 1.0)
+
+        # Print out iteration update
+        # @printf "k    f         logmu α  ρ\n"
+        @printf "%4i % 13.6e %.3e %.3e %.3e \n" k o.fₖ₊₁ o.μ o.α o.ρ
+
+        if abs(o.fₖ - o.fₖ₊₁) < o.f_abs_tol
+            println("Absolute function tolerance satisfied.")
+            if o.μ > 1e-6
+                o.μ *= 0.3
+                o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
+                opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
+                reset_hessian!(o)
+                continue
+            else
+                println("Optimal solution found")
+                break
+            end
+        end
+
+        if abs((o.fₖ - o.fₖ₊₁) / o.fₖ) < o.f_rel_tol
+            println("Relative function tolerance satisfied.")
+            if o.μ > 1e-6
+                o.μ *= 0.3
+                o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
+                opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
+                reset_hessian!(o)
+                continue
+            else
+                println("Optimal solution found")
+                break
+            end
+        end
+
+        if norm(o.gₖ) < o.g_abs_tol
+            println("Absolute gradient tolerance satisfied.")
+            if o.μ > 1e-6
+                o.μ *= 0.3
+                o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
+                opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
+                reset_hessian!(o)
+                continue
+            else
+                println("Optimal solution found")
+                break
+            end
+        end
+    end
 end

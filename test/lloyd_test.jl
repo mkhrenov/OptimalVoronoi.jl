@@ -25,8 +25,8 @@ points .= pcopy
 points .= pcopy
 @time voronoi = WeightedCVT.lloyd(points, Ω);
 
-# points .= pcopy
-# @profview voronoi = WeightedCVT.lloyd(points, Ω);
+points .= pcopy
+@profview voronoi = WeightedCVT.lloyd(points, Ω);
 
 # points .= pcopy
 # @profview_allocs voronoi = WeightedCVT.lloyd(points, Ω) sample_rate=0.001

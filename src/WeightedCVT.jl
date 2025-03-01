@@ -10,6 +10,7 @@ using ForwardDiff
 
 using CUDA
 using GLMakie
+using Printf
 
 include("sdf.jl")
 include("optimizer.jl")
