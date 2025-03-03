@@ -14,20 +14,22 @@ WeightedCVT.sdf_sphere!(sdf, 15, 24, 15, 8)
 # WeightedCVT.sdf_box!(sdf, 15, 24, 15, 16, 16, 16)
 
 Ω = WeightedCVT.Ω_from_array(sdf)
-T(x) = exp(-((x[1] - 15)^2 + (x[2] - 24)^2 + (x[3] - 24)^2) / 5^2)
+T(x) = (((x[1] - 15)^2 + (x[2] - 24)^2 + (x[3] - 24)^2) + 1e-4)^(-0.5) * exp(-((x[2] - 24) + (((x[1] - 15)^2 + (x[2] - 24)^2 + (x[3] - 24)^2))^(0.5)) / 5^2)
 
-points = WeightedCVT.sample_from_discrete_sdf(sdf, 100)
+points = WeightedCVT.sample_from_discrete_sdf(sdf, 500)
 
 pcopy = copy(points)
 
 points .= pcopy
+# voronoi = WeightedCVT.lloyd(points, Ω)
+# points .= voronoi.cell_centers
 @time voronoi = WeightedCVT.minimum_variance_voronoi(points, Ω, T; max_iters=1000);
 
 # points .= pcopy
 # @time voronoi = WeightedCVT.minimum_variance_voronoi(points, Ω, T);
 
-points .= pcopy
-@profview voronoi = WeightedCVT.minimum_variance_voronoi(points, Ω, T);
+# points .= pcopy
+# @profview voronoi = WeightedCVT.minimum_variance_voronoi(points, Ω, T);
 
 # points .= pcopy
 # @profview_allocs voronoi = WeightedCVT.minimum_variance_voronoi(points, Ω, T) sample_rate=0.001

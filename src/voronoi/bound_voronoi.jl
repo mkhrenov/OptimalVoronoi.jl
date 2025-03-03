@@ -122,10 +122,26 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
         # First, compute mean out towards surface direction 
         init = SVector{3,Float64}(unbounded_voronoi.cell_centers[1, c], unbounded_voronoi.cell_centers[2, c], unbounded_voronoi.cell_centers[3, c])
         dir = zero(SVector{3,Float64})
-        for v::Int in vertices_to_close
-            dir += SVector{3,Float64}(vertices_new[1, v], vertices_new[2, v], vertices_new[3, v])
+        totl = 0.0
+        for e::Int in edges_to_close
+            vs = view(rowvals(E0_newT), nzrange(E0_newT, e))
+            v1::Int = vs[1]
+            v2::Int = vs[2]
+            v_1 = SVector{3,Float64}(vertices_new[1, v1], vertices_new[2, v1], vertices_new[3, v1])
+            v_2 = SVector{3,Float64}(vertices_new[1, v2], vertices_new[2, v2], vertices_new[3, v2])
+            dir += (v_1 + v_2) / 2.0 * norm(v_1 - v_2)
+            totl += norm(v_1 - v_2)
         end
-        dir = (dir / length(vertices_to_close)) - init
+        dir /= totl
+
+        dir = dir - init
+
+        # for v::Int in vertices_to_close
+        #     dir += SVector{3,Float64}(vertices_new[1, v], vertices_new[2, v], vertices_new[3, v])
+        # end
+        # dir = (dir / length(vertices_to_close)) - init
+
+
         dir /= norm(dir)
 
         # Find intersection point with ∂Ω
