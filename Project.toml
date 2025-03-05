@@ -1,4 +1,4 @@
-name = "WeightedCVT"
+name = "OptimalVoronoi"
 uuid = "770ca0ce-b1ea-490c-93de-6aee52022c72"
 authors = ["Mikhail Khrenov <mkhrenov34@gmail.com>"]
 version = "0.1.0"

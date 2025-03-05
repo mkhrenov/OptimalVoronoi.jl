@@ -2,7 +2,7 @@
 function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellComplex{DMT,SMT}, Ω::F; tol=1e-2) where {DMT,SMT,F}
 
     # Get subset of the voronoi with points outside Ω removed
-    to_drop = .!WeightedCVT.in_Ω(unbounded_voronoi.vertices, Ω)
+    to_drop = .!in_Ω(unbounded_voronoi.vertices, Ω)
     pruned_voronoi = prune_points(unbounded_voronoi, to_drop)
 
     # Find edges that should exist based on faces present in the Delaunay tetrahedralization, but that do not exist in the pruned Voronoi diagram
