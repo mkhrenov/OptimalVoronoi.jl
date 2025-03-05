@@ -1,3 +1,3 @@
 include("optimizer.jl")
-include("lloyd.jl")
+include("centroidal.jl")
 include("minimum_variance.jl")

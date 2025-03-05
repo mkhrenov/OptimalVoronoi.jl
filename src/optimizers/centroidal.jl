@@ -1,4 +1,4 @@
-function lloyd(points::DMT, Ω::F; SMT=SparseMatrixCSC{Int,Int}, tol=1e-3, max_iters=1000) where {DMT,F}
+function centroidal_voronoi(points::DMT, Ω::F; SMT=SparseMatrixCSC{Int,Int}, tol=1e-3, max_iters=1000) where {DMT,F}
     n = size(points, 2)
     z₀ = vec(points)
 

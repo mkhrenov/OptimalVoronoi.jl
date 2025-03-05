@@ -20,16 +20,16 @@ pcopy = copy(points)
 scatter(points)
 
 points .= pcopy
-@time voronoi = lloyd(points, Ω);
+@time voronoi = centroidal_voronoi(points, Ω);
 
 points .= pcopy
-@time voronoi = lloyd(points, Ω);
+@time voronoi = centroidal_voronoi(points, Ω);
 
 points .= pcopy
-@profview voronoi = lloyd(points, Ω);
+@profview voronoi = centroidal_voronoi(points, Ω);
 
 # points .= pcopy
-# @profview_allocs voronoi = lloyd(points, Ω) sample_rate=0.001
+# @profview_allocs voronoi = centroidal_voronoi(points, Ω) sample_rate=0.001
 
 voronoi.vertices .-= 0.5
 voronoi.cell_centers .-= 0.5
