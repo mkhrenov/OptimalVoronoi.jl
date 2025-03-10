@@ -56,6 +56,16 @@ function cells_of_face(complex::CellComplex{DMT,SparseMatrixCSC{Int,Int}}, face:
     return view(rowvals(complex.E2), nzrange(complex.E2, face))
 end
 
+function other_cell_of_face(complex::CellComplex{DMT,SparseMatrixCSC{Int,Int}}, face::Int, primary_cell::Int) where {DMT}
+    for cell in cells_of_face(complex, face)
+        if cell != primary_cell
+            return cell
+        end
+    end
+
+    return 0
+end
+
 struct SubComplex{DMT,SMT,V}
     parent::CellComplex{DMT,SMT}
 

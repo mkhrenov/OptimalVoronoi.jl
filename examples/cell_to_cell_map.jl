@@ -25,7 +25,7 @@ points2 = cu(points2)
 @time color_voronoi!(domain1, points1)
 @time color_voronoi!(domain2, points2)
 
-@time c2c = OptimalVoronoi.cell_to_cell_map(domain1, domain2)
+@time c2c = cell_to_cell_map(domain1, domain2)
 
 # Move data back to CPU
 domain1 = Array(domain1)

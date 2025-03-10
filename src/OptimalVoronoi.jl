@@ -21,6 +21,8 @@ export sdf_box!, sdf_sphere!
 
 export cell_averages, complex_volumes, complex_volume
 
+export cell_to_cell_map, mesh_fv_matrix_vector
+
 export centroidal_voronoi, minimum_variance_voronoi
 export viz!, viz
 
@@ -33,6 +35,8 @@ include("cell_complex_voronoi/cell_complex_voronoi.jl")
 include("voxel_voronoi/voxel_voronoi.jl")
 
 include("optimizers/optimizers.jl")
+
+include("finite_volume/finite_volume.jl")
 
 include("viz.jl")
 

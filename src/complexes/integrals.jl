@@ -97,6 +97,29 @@ function cone_centroid(complex::CellComplex{DMT,SMT}, cell::Int, face::Int) wher
     return con_centroid / vol, vol
 end
 
+function face_area(complex::CellComplex{DMT,SMT}, face::Int) where {DMT,SMT}
+    fc = face_centroid(complex, face)
+    area = 0.0
+
+    for edge in edges_of_face(complex, face)
+        edge_vertices = verts_of_edge(complex, edge)
+
+        area += triangle_area(
+            view(complex.vertices, :, edge_vertices[1]),
+            view(complex.vertices, :, edge_vertices[2]),
+            fc
+        )
+    end
+
+    return area
+end
+
+function cell_separation(complex::CellComplex{DMT,SMT}, cell_i::Int, cell_j::Int) where {DMT,SMT}
+    p_i = SVector{3}(complex.cell_centers[1, cell_i], complex.cell_centers[2, cell_i], complex.cell_centers[3, cell_i])
+    p_j = SVector{3}(complex.cell_centers[1, cell_j], complex.cell_centers[2, cell_j], complex.cell_centers[3, cell_j])
+    return norm(p_i - p_j)
+end
+
 function simplex_volume(a, b, c, d)
     av = SVector{3,Float64}(a[1], a[2], a[3])
     bv = SVector{3,Float64}(b[1], b[2], b[3])
@@ -117,6 +140,14 @@ function simplex_centroid(a, b, c, d)
     dv = SVector{3,Float64}(d[1], d[2], d[3])
 
     return (av + bv + cv + dv) / 4.0
+end
+
+function triangle_area(a, b, c)
+    av = SVector{3,Float64}(a[1], a[2], a[3])
+    bv = SVector{3,Float64}(b[1], b[2], b[3])
+    cv = SVector{3,Float64}(c[1], c[2], c[3])
+
+    return (1 / 2) * norm((av - cv) × (bv - cv))
 end
 
 function face_centroid(complex::CellComplex{DMT,SMT}, face::Int) where {DMT,SMT}
