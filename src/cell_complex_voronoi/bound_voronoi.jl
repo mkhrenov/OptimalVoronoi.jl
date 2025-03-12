@@ -81,13 +81,13 @@ function bound_voronoi(unbounded_voronoi::CellComplex{DMT,SMT}, delaunay::CellCo
     extant_edges = voronoi_edges_to_add .|| pruned_voronoi.edge_sub
     extant_faces = (unbounded_voronoi.E1 * extant_edges .> 0) .|| pruned_voronoi.face_sub
 
-
     # Close open face loops
-    # Do this by finding which vertices are only incident to one face
+    # Do this by finding which vertices are incident to a face through only one edge
     vertex_face_incidence = transpose(E0_new) * unbounded_voronoi.E1T
     dangling_vertices = ((Diagonal(extant_indices) * vertex_face_incidence) .== 1)
 
     # The faces which have such vertices incident to them will get a new edge connecting them
+    # errors arise when a face has been chopped on more than one side (there's a entry in open_faces > 2, i.e. 4, 6, etc.)
     open_faces = vec(sum(dangling_vertices, dims=1)) .> 0
     N_new_face_edges = sum(open_faces)
     new_face_cols = 1:N_new_face_edges
