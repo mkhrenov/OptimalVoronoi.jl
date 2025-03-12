@@ -1,29 +1,29 @@
 # Primitives to build up bead geometry
 function sdf_box!(sdf, px, py, pz, lx, ly, lz)
-    for cidx in CartesianIndices(sdf)
-        x, y, z = cidx[1], cidx[2], cidx[3]
-        dx = abs(x - px) / (lx / 2)
-        dy = abs(y - py) / (ly / 2)
-        dz = abs(z - pz) / (lz / 2)
+    map!((cidx, d_o) -> begin
+            x, y, z = cidx[1], cidx[2], cidx[3]
+            dx = abs(x - px) / (lx / 2)
+            dy = abs(y - py) / (ly / 2)
+            dz = abs(z - pz) / (lz / 2)
 
-        d = 0.0
-        if dx > dy && dx > dz
-            d = (dx - 1.0) * (lx / 2)
-        elseif dy > dz
-            d = (dy - 1.0) * (ly / 2)
-        else
-            d = (dz - 1.0) * (lz / 2)
-        end
+            d = 0.0
+            if dx > dy && dx > dz
+                d = (dx - 1.0) * (lx / 2)
+            elseif dy > dz
+                d = (dy - 1.0) * (ly / 2)
+            else
+                d = (dz - 1.0) * (lz / 2)
+            end
 
-        sdf[cidx] = min(sdf[cidx], d)
-    end
+            return min(d_o, d)
+        end, sdf, CartesianIndices(sdf), sdf)
 end
 
 function sdf_sphere!(sdf, px, py, pz, r)
-    for cidx in CartesianIndices(sdf)
-        x, y, z = cidx[1], cidx[2], cidx[3]
-        sdf[cidx] = min(sdf[cidx], √((x - px)^2 + (y - py)^2 + (z - pz)^2) - r)
-    end
+    map!((cidx, d_o) -> begin
+            x, y, z = cidx[1], cidx[2], cidx[3]
+            return min(d_o, √((x - px)^2 + (y - py)^2 + (z - pz)^2) - r)
+        end, sdf, CartesianIndices(sdf), sdf)
 end
 
 # Treat indices as XYZ
