@@ -36,10 +36,8 @@ mutable struct BFGSOptimizerState{F,G,C,ST,VT,MT}
 
     function BFGSOptimizerState(
         f::F, g!::G, Ω::C, Nx; μ₀=0.1, α₀=1.0, max_iters=10_000, verbosity=4,
-        f_abs_tol=1e-6, g_abs_tol=1e-4, f_rel_tol=1e-6, g_rel_tol=1e-4) where {F,G,C}
-        ST = Float64
-        VT = Vector{ST}
-        MT = Matrix{ST}
+        f_abs_tol=1e-6, g_abs_tol=1e-4, f_rel_tol=1e-6, g_rel_tol=1e-4,
+        ST=Float64, VT=Vector{ST}, MT=Matrix{ST}) where {F,G,C}
 
         xₖ = zeros(Nx)
         xₖ₊₁ = zeros(Nx)
@@ -86,7 +84,7 @@ function reset_hessian!(o::BFGSOptimizerState)
     o.ρ = 0.0
     o.α = 1.0
     o.Bₖ .= 0.0
-    o.Bₖ[diagind(o.Bₖ)] .= 1.0
+    o.Bₖ[diagind(o.Bₖ)] .= 1.0 * norm(o.gₖ)
     o.Bₒ .= o.Bₖ
 end
 
@@ -96,9 +94,9 @@ function opt_objective(o::BFGSOptimizerState, x)
 
     # Add penalties SDF
     points = reshape(x, 3, :)
-    for point in eachcol(points)
-        obj -= o.μ * log(o.lim - o.Ω(point))
-    end
+    # for point in eachcol(points)
+    #     obj -= o.μ * log(o.lim - o.Ω(point))
+    # end
 
     return obj
 end
@@ -113,9 +111,9 @@ function opt_gradient!(o::BFGSOptimizerState, g, x)
     # Compute penalty gradient
     points = reshape(x, 3, :)
     g_points = reshape(g, 3, :)
-    for (point, g_point) in zip(eachcol(points), eachcol(g_points))
-        g_point .+= (o.μ / (o.lim - o.Ω(point))) .* ForwardDiff.gradient(o.Ω, point)
-    end
+    # for (point, g_point) in zip(eachcol(points), eachcol(g_points))
+    #     g_point .+= (o.μ / (o.lim - o.Ω(point))) .* ForwardDiff.gradient(o.Ω, point)
+    # end
 end
 
 function descent_direction!(o::BFGSOptimizerState; max_reg_iter=50, ρₘᵢₙ=1e-10, ρₘₐₓ=1e10)
@@ -163,16 +161,19 @@ function linesearch!(o::BFGSOptimizerState)
 
         points = reshape(o.xₖ₊₁, 3, :)
 
-        if (maximum(o.Ω, eachcol(points)) < -o.lim)
-            o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
+        # if (maximum(o.Ω, eachcol(points)) < -o.lim)
+        # o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
 
-            if (o.fₖ₊₁ ≤ o.fₖ + 1e-4 * o.α * dot(o.p, o.gₖ))
-                @. o.s = o.α * o.p
-                return true
-            end
-        else
-            # println("Overshoot of $(maximum(o.Ω, eachcol(points))), α=$(o.α)")
-        end
+        # @show o.fₖ
+        # @show o.fₖ₊₁
+
+        # if (o.fₖ₊₁ ≤ o.fₖ + 1e-4 * o.α * dot(o.p, o.gₖ))
+        @. o.s = o.α * o.p
+        return true
+        # end
+        # else
+        #     # println("Overshoot of $(maximum(o.Ω, eachcol(points))), α=$(o.α)")
+        # end
 
         o.α *= 0.2
     end
@@ -214,17 +215,18 @@ function optimize_voronoi!(o::BFGSOptimizerState, x₀)
         opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
         @. o.y = o.gₖ₊₁ - o.gₖ
 
-        sTy = dot(o.s, o.y)
-        sBs = dot(o.s, o.Bₖ, o.s)
+        # sTy = dot(o.s, o.y)
+        sBs = dot(o.s' * o.Bₖ, o.s)
 
         # Compute curvature damping
-        θ = (sTy ≥ 0.2 * sBs) ? 1.0 : (0.8 * sBs) / (sBs - sTy)
+        # θ = (sTy ≥ 0.2 * sBs) ? 1.0 : (0.8 * sBs) / (sBs - sTy)
 
         # Update damped secant
         # r = θ * y + (1 - θ) * B * s
-        mul!(o.r, o.Bₖ, o.s)
-        o.r .*= (1.0 - θ)
-        o.r .+= θ .* o.y
+        # mul!(o.r, o.Bₖ, o.s)
+        # o.r .*= (1.0 - θ)
+        # o.r .+= θ .* o.y
+        o.r .= o.y
 
         sTr = dot(o.s, o.r)
 
@@ -240,46 +242,46 @@ function optimize_voronoi!(o::BFGSOptimizerState, x₀)
         # @printf "k    f         logmu α  ρ\n"
         @printf "%4i % 13.6e %.3e %.3e %.3e \n" k o.fₖ₊₁ o.μ o.α o.ρ
 
-        if abs(o.fₖ - o.fₖ₊₁) < o.f_abs_tol
-            println("Absolute function tolerance satisfied.")
-            if o.μ > 1e-6
-                o.μ *= 0.3
-                o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
-                opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
-                reset_hessian!(o)
-                continue
-            else
-                println("Optimal solution found")
-                break
-            end
-        end
+        # if abs(o.fₖ - o.fₖ₊₁) < o.f_abs_tol
+        #     println("Absolute function tolerance satisfied.")
+        #     if o.μ > 1e-6
+        #         o.μ *= 0.3
+        #         o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
+        #         opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
+        #         reset_hessian!(o)
+        #         continue
+        #     else
+        #         println("Optimal solution found")
+        #         break
+        #     end
+        # end
 
-        if abs((o.fₖ - o.fₖ₊₁) / o.fₖ) < o.f_rel_tol
-            println("Relative function tolerance satisfied.")
-            if o.μ > 1e-6
-                o.μ *= 0.3
-                o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
-                opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
-                reset_hessian!(o)
-                continue
-            else
-                println("Optimal solution found")
-                break
-            end
-        end
+        # if abs((o.fₖ - o.fₖ₊₁) / o.fₖ) < o.f_rel_tol
+        #     println("Relative function tolerance satisfied.")
+        #     if o.μ > 1e-6
+        #         o.μ *= 0.3
+        #         o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
+        #         opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
+        #         reset_hessian!(o)
+        #         continue
+        #     else
+        #         println("Optimal solution found")
+        #         break
+        #     end
+        # end
 
-        if norm(o.gₖ) < o.g_abs_tol
+        if norm(o.gₖ) / sqrt(length(o.gₖ)) < o.g_abs_tol
             println("Absolute gradient tolerance satisfied.")
-            if o.μ > 1e-6
-                o.μ *= 0.3
-                o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
-                opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
-                reset_hessian!(o)
-                continue
-            else
-                println("Optimal solution found")
-                break
-            end
+            # if o.μ > 1e-6
+            #     o.μ *= 0.3
+            #     o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
+            #     opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
+            #     reset_hessian!(o)
+            #     continue
+            # else
+            println("Optimal solution found")
+            break
+            # end
         end
     end
 end
