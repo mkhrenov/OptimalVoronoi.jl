@@ -56,40 +56,40 @@ function volume_kernel!(domain::CuDeviceArray{T1,D,M}, volumes::CuDeviceVector{T
 end
 
 function cell_to_cell_map(domain1, domain2, n_cells_1, n_cells_2)
-    adjacency = zeros(n_cells_2, n_cells_1)
+    incidence = zeros(n_cells_2, n_cells_1)
 
     for (i, j) in zip(domain2, domain1)
         if i == 0 || j == 0
             continue
         end
 
-        adjacency[i, j] += 1.0
+        incidence[i, j] += 1.0
     end
 
-    adjacency ./= cell_volumes(domain2, n_cells_2)
-    return sparse(adjacency)
+    incidence ./= cell_volumes(domain2, n_cells_2)
+    return sparse(incidence)
 end
 
 function cell_to_cell_map(domain1::CuArray{T,D,M}, domain2::CuArray{T,D,M}, n_cells_1, n_cells_2) where {T,D,M}
-    adjacency = CUDA.zeros(n_cells_2, n_cells_1)
+    incidence = CUDA.zeros(n_cells_2, n_cells_1)
 
     nthreads = 256
     nblocks = ceil(Int, length(domain1) / nthreads)
 
-    @cuda threads = nthreads blocks = nblocks adjacency_kernel!(domain1, domain2, adjacency)
+    @cuda threads = nthreads blocks = nblocks incidence_kernel!(domain1, domain2, incidence)
 
-    adjacency ./= cell_volumes(domain2, n_cells_2)
-    return sparse(adjacency)
+    incidence ./= cell_volumes(domain2, n_cells_2)
+    return sparse(incidence)
 end
 
-function adjacency_kernel!(domain1::CuDeviceArray{T1,D,M}, domain2::CuDeviceArray{T1,D,M}, adjacency::CuDeviceMatrix{T2,M}) where {T1,T2,D,M}
+function incidence_kernel!(domain1::CuDeviceArray{T1,D,M}, domain2::CuDeviceArray{T1,D,M}, incidence::CuDeviceMatrix{T2,M}) where {T1,T2,D,M}
     i = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     if i > length(domain1)
         return nothing
     end
 
     if domain1[i] != 0 && domain2[i] != 0
-        CUDA.@atomic adjacency[domain2[i], domain1[i]] += 1.0
+        CUDA.@atomic incidence[domain2[i], domain1[i]] += 1.0
     end
 
     return nothing
