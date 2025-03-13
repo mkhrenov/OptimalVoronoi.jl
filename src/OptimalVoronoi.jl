@@ -14,7 +14,7 @@ using Printf
 
 export delaunay_tet, condense_delaunay, is_delaunay
 export dual_complex, bound_voronoi, bounded_voronoi
-export color_voronoi!
+export color_voronoi!, adjacency_matrix_vector!, cell_volume_integrals!, neighbor_surface_integrals!
 
 export Ω_from_array, in_Ω, sample_from_discrete_sdf
 export sdf_box!, sdf_sphere!
