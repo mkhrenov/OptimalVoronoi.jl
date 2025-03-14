@@ -96,3 +96,64 @@ function sample_from_discrete_sdf(sdf, N)
 
     return points
 end
+
+function eval_sdf!(Ω::G, c, points) where {G}
+    map!(p -> Ω(p), c, eachcol(points))
+end
+
+function eval_sdf!(Ω::G, c::CuVector{T,M}, points::CuMatrix{T,M}) where {G,T,M}
+    nthreads = 256
+    nblocks = ceil(Int, length(c) / nthreads)
+
+    @cuda threads = nthreads blocks = nblocks eval_sdf_kernel(Ω, c, points)
+end
+
+function eval_sdf_kernel(Ω::G, c::CuDeviceVector{T,M}, points::CuDeviceMatrix{T,M}) where {G,T,M}
+    x = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
+
+    if x > length(c)
+        return nothing
+    end
+
+    p = SVector{3}(points[1, x], points[2, x], points[3, x])
+    c[x] = Ω(p)
+
+    return nothing
+end
+
+function eval_sdf_grad!(Ω::G, g_points, points) where {G}
+    for (gv, pv) in zip(eachcol(g_points), eachcol(points))
+        finite_difference_gradient!(gv, Ω, pv)
+    end
+end
+
+function eval_sdf_grad!(Ω::G, g_points::CuMatrix{T,M}, points::CuMatrix{T,M}) where {G,T,M}
+    nthreads = 256
+    nblocks = ceil(Int, size(points, 2) / nthreads)
+
+    @cuda threads = nthreads blocks = nblocks eval_sdf_grad_kernel(Ω, g_points, points)
+end
+
+function eval_sdf_grad_kernel(Ω::G, g_points::CuDeviceMatrix{T,M}, points::CuDeviceMatrix{T,M}) where {G,T,M}
+    x = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
+
+    if x > size(points, 2)
+        return nothing
+    end
+
+    p = SVector{3}(points[1, x], points[2, x], points[3, x])
+    finite_difference_gradient!(view(g_points, :, x), Ω, p)
+
+    return nothing
+end
+
+function finite_difference_gradient!(g, f::F, x) where {F}
+    h = 0.25
+    dx = SVector{3}(h, 0.0, 0.0)
+    dy = SVector{3}(0.0, h, 0.0)
+    dz = SVector{3}(0.0, 0.0, h)
+
+    g[1] = (f(x + dx) - f(x - dx)) / 2h
+    g[2] = (f(x + dy) - f(x - dy)) / 2h
+    g[3] = (f(x + dz) - f(x - dz)) / 2h
+end

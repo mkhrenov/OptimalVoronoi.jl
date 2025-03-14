@@ -1,3 +1,7 @@
+function paint!(dst, domain, cell_vals)
+    map!(c -> c == 0 ? 0.0 : cell_vals[c], dst, domain)
+end
+
 """
     Color the N-dimensional `domain` (representing a regular voxel grid)
     based on which point in points it is closest too.

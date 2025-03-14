@@ -23,6 +23,9 @@ mutable struct BFGSOptimizerState{F,G,C,ST,VT,MT}
     xₖ₊₁::VT
     gₖ::VT
     gₖ₊₁::VT
+    cₖ::VT
+    cₖ₊₁::VT
+
 
     Bₖ::MT
     Bₒ::MT
@@ -35,7 +38,7 @@ mutable struct BFGSOptimizerState{F,G,C,ST,VT,MT}
     r::VT
 
     function BFGSOptimizerState(
-        f::F, g!::G, Ω::C, Nx; μ₀=0.1, α₀=1.0, max_iters=10_000, verbosity=4,
+        f::F, g!::G, Ω::C, Nx, Nc; μ₀=0.1, α₀=1.0, max_iters=10_000, verbosity=4,
         f_abs_tol=1e-6, g_abs_tol=1e-4, f_rel_tol=1e-6, g_rel_tol=1e-4,
         ST=Float64, VT=Vector{ST}, MT=Matrix{ST}) where {F,G,C}
 
@@ -43,6 +46,8 @@ mutable struct BFGSOptimizerState{F,G,C,ST,VT,MT}
         xₖ₊₁ = zeros(Nx)
         gₖ = zeros(Nx)
         gₖ₊₁ = zeros(Nx)
+        cₖ = zeros(Nc)
+        cₖ₊₁ = zeros(Nc)
 
         Bₖ = zeros(Nx, Nx)
         Bₒ = zeros(Nx, Nx)
@@ -60,7 +65,7 @@ mutable struct BFGSOptimizerState{F,G,C,ST,VT,MT}
             f_abs_tol, g_abs_tol, f_rel_tol, g_rel_tol,
             f, g!, Ω,
             0.0, 0.0,
-            xₖ, xₖ₊₁, gₖ, gₖ₊₁,
+            xₖ, xₖ₊₁, gₖ, gₖ₊₁, cₖ, cₖ₊₁,
             Bₖ, Bₒ, o_prod_1, o_prod_2,
             y, p, s, r
         )
@@ -71,10 +76,10 @@ function initialize!(o::BFGSOptimizerState, x₀)
     o.xₖ .= x₀
     o.xₖ₊₁ .= x₀
 
-    o.fₖ = opt_objective(o, o.xₖ)
+    o.fₖ = opt_objective(o, o.xₖ, o.cₖ)
     o.fₖ₊₁ = o.fₖ
 
-    opt_gradient!(o, o.gₖ, o.xₖ)
+    opt_gradient!(o, o.gₖ, o.xₖ, o.cₖ)
     o.gₖ₊₁ .= o.gₖ
 
     reset_hessian!(o)
@@ -88,32 +93,37 @@ function reset_hessian!(o::BFGSOptimizerState)
     o.Bₒ .= o.Bₖ
 end
 
-function opt_objective(o::BFGSOptimizerState, x)
+function opt_objective(o::BFGSOptimizerState, x, c)
     # Compute main objective
     obj = o.f(x)
 
     # Add penalties SDF
     points = reshape(x, 3, :)
-    # for point in eachcol(points)
-    #     obj -= o.μ * log(o.lim - o.Ω(point))
-    # end
+    eval_sdf!(o.Ω, c, points)
+    c .+= o.lim
 
-    return obj
+    # return obj - o.μ * sum(c -> log(-c), c)
+    return obj + o.μ * sum(c -> 1 / (abs(c)), c)
 end
 
-function opt_gradient!(o::BFGSOptimizerState, g, x)
+function opt_gradient!(o::BFGSOptimizerState, g, x, c)
     # Clear gradient
     g .= 0.0
-
-    # Compute main objective gradient
-    o.g!(g, x)
 
     # Compute penalty gradient
     points = reshape(x, 3, :)
     g_points = reshape(g, 3, :)
-    # for (point, g_point) in zip(eachcol(points), eachcol(g_points))
-    #     g_point .+= (o.μ / (o.lim - o.Ω(point))) .* ForwardDiff.gradient(o.Ω, point)
-    # end
+
+    eval_sdf!(o.Ω, c, points)
+    # @show c
+    c .+= o.lim
+    eval_sdf_grad!(o.Ω, g_points, points)
+
+    g_points .*= o.μ ./ c'
+    g_points ./= c' # For 1/c
+
+    # Compute main objective gradient
+    o.g!(g, x)
 end
 
 function descent_direction!(o::BFGSOptimizerState; max_reg_iter=50, ρₘᵢₙ=1e-10, ρₘₐₓ=1e10)
@@ -156,31 +166,31 @@ end
 function linesearch!(o::BFGSOptimizerState)
     o.α = clamp(1.5 * o.α, 0.0, 1.0)
 
-    while o.α ≥ 1e-8
+    while o.α ≥ 1e-12
         @. o.xₖ₊₁ = o.xₖ + o.α * o.p
-
         points = reshape(o.xₖ₊₁, 3, :)
+        eval_sdf!(o.Ω, o.cₖ₊₁, points)
 
-        # if (maximum(o.Ω, eachcol(points)) < -o.lim)
-        # o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
+        if (maximum(o.cₖ₊₁) < -o.lim)
+            o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁, o.cₖ₊₁)
 
-        # @show o.fₖ
-        # @show o.fₖ₊₁
-
-        # if (o.fₖ₊₁ ≤ o.fₖ + 1e-4 * o.α * dot(o.p, o.gₖ))
-        @. o.s = o.α * o.p
-        return true
-        # end
-        # else
-        #     # println("Overshoot of $(maximum(o.Ω, eachcol(points))), α=$(o.α)")
-        # end
+            if (o.fₖ₊₁ ≤ o.fₖ + 1e-4 * o.α * dot(o.p, o.gₖ))
+                @. o.s = o.α * o.p
+                return true
+                # else
+                #     println("insufficient descent")
+            end
+            # else
+            #     println("overshoot")
+        end
 
         o.α *= 0.2
     end
     println("Line-search failed, α: $(o.α)")
-    o.α = 1e-10
+    o.α = 1e-13
+    @. o.xₖ₊₁ = o.xₖ + o.α * o.p
     @. o.s = o.α * o.p
-    o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
+    o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁, o.cₖ₊₁)
 
     o.α = 1.0
     return false
@@ -193,8 +203,9 @@ function optimize_voronoi!(o::BFGSOptimizerState, x₀)
 
     for k in 1:o.max_iters
         # Get gradient at xₖ from previous iteration
-        o.gₖ .= o.gₖ₊₁
         o.xₖ .= o.xₖ₊₁
+        o.gₖ .= o.gₖ₊₁
+        o.cₖ .= o.cₖ₊₁
         o.fₖ = o.fₖ₊₁
 
         # Solve for descent direction pₖ
@@ -204,7 +215,7 @@ function optimize_voronoi!(o::BFGSOptimizerState, x₀)
         if !linesearch!(o)
             # println("Resetting hessian")
             reset_hessian!(o)
-            opt_gradient!(o, o.gₖ, o.xₖ)
+            opt_gradient!(o, o.gₖ, o.xₖ, o.cₖ)
             descent_direction!(o)
             linesearch!(o)
         end
@@ -212,7 +223,7 @@ function optimize_voronoi!(o::BFGSOptimizerState, x₀)
         # Iterate updated by linesearch
 
         # Get gradient at xₖ₊₁, compute secant
-        opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
+        opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁, o.cₖ₊₁)
         @. o.y = o.gₖ₊₁ - o.gₖ
 
         # sTy = dot(o.s, o.y)
@@ -240,48 +251,63 @@ function optimize_voronoi!(o::BFGSOptimizerState, x₀)
 
         # Print out iteration update
         # @printf "k    f         logmu α  ρ\n"
-        @printf "%4i % 13.6e %.3e %.3e %.3e \n" k o.fₖ₊₁ o.μ o.α o.ρ
+        @printf "%4i % 13.6e %.3e %.3e %.3e %.3e\n" k o.fₖ₊₁ o.μ o.α o.ρ norm(o.gₖ₊₁)
 
-        # if abs(o.fₖ - o.fₖ₊₁) < o.f_abs_tol
-        #     println("Absolute function tolerance satisfied.")
-        #     if o.μ > 1e-6
-        #         o.μ *= 0.3
-        #         o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
-        #         opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
-        #         reset_hessian!(o)
-        #         continue
-        #     else
-        #         println("Optimal solution found")
-        #         break
-        #     end
-        # end
+        if abs(o.fₖ - o.fₖ₊₁) < o.f_abs_tol
+            println("Absolute function tolerance satisfied.")
+            if o.μ > 1e-6
+                o.μ *= 0.3
+                o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁, o.cₖ₊₁)
+                opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁, o.cₖ₊₁)
+                reset_hessian!(o)
+                continue
+            else
+                println("Optimal solution found")
+                break
+            end
+        end
 
-        # if abs((o.fₖ - o.fₖ₊₁) / o.fₖ) < o.f_rel_tol
-        #     println("Relative function tolerance satisfied.")
-        #     if o.μ > 1e-6
-        #         o.μ *= 0.3
-        #         o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
-        #         opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
-        #         reset_hessian!(o)
-        #         continue
-        #     else
-        #         println("Optimal solution found")
-        #         break
-        #     end
-        # end
+        if abs((o.fₖ - o.fₖ₊₁) / o.fₖ) < o.f_rel_tol
+            println("Relative function tolerance satisfied.")
+            if o.μ > 1e-6
+                o.μ *= 0.3
+                o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁, o.cₖ₊₁)
+                opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁, o.cₖ₊₁)
+                reset_hessian!(o)
+                continue
+            else
+                println("Optimal solution found")
+                break
+            end
+        end
 
         if norm(o.gₖ) / sqrt(length(o.gₖ)) < o.g_abs_tol
             println("Absolute gradient tolerance satisfied.")
-            # if o.μ > 1e-6
-            #     o.μ *= 0.3
-            #     o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁)
-            #     opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁)
-            #     reset_hessian!(o)
-            #     continue
-            # else
-            println("Optimal solution found")
-            break
-            # end
+            if o.μ > 1e-6
+                o.μ *= 0.3
+                o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁, o.cₖ₊₁)
+                opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁, o.cₖ₊₁)
+                reset_hessian!(o)
+                continue
+            else
+                println("Optimal solution found")
+                break
+            end
         end
+
+        # @show o.gₖ
+        # if o.gₖ' * inv(o.Bₖ) * o.gₖ < o.g_rel_tol
+        #     println("Relative gradient tolerance satisfied.")
+        #     if o.μ > 1e-6
+        #         o.μ *= 0.3
+        #         o.fₖ₊₁ = opt_objective(o, o.xₖ₊₁, o.cₖ₊₁)
+        #         opt_gradient!(o, o.gₖ₊₁, o.xₖ₊₁, o.cₖ₊₁)
+        #         reset_hessian!(o)
+        #         continue
+        #     else
+        #         println("Optimal solution found")
+        #         break
+        #     end
+        # end
     end
 end
