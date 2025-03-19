@@ -30,35 +30,21 @@ points = cu(points)
 volumes = CUDA.zeros(1, N_cells)
 centroids = copy(points)#CUDA.zeros(3, N_cells)
 sqdist = CUDA.zeros(1, N_cells)
-A = CUDA.zeros(Int, N_cells, N_cells)
-e = CUDA.zeros(Int, N_cells)
+A = CUDA.zeros(N_cells, N_cells)
+e = CUDA.zeros(N_cells)
 
-###################### Needs constraints to be re-introduced, line-search re-enabled ################################
 ###################### Ideally should use make it so that so we don't need to compute the objective, prevent GPU synchronizations ###########
-###################### Could use a penalty method rather than barrier / IP now that we're unshackled from cell complex construction again? ########
 
-@time voronoi = OptimalVoronoi.centroidal_voronoi_vox(points, Ω, domain, sqdist);
+CUDA.@time voronoi = centroidal_voronoi_vox(points, Ω, domain, sqdist);
+CUDA.@time voronoi = centroidal_voronoi_vox(points, Ω, domain, sqdist);
 points .= voronoi
 
-@time voronoi = OptimalVoronoi.minimum_variance_voronoi_vox(points, Ω, T, domain, sqdist, volumes, A, e; max_iters=500);
+CUDA.@time voronoi = minimum_variance_voronoi_vox(points, Ω, T, domain, sqdist, volumes, A, e);
+CUDA.@time voronoi = minimum_variance_voronoi_vox(points, Ω, T, domain, sqdist, volumes, A, e);
 points .= voronoi
-
-
-# points .= pcopy
-# @time voronoi = minimum_variance_voronoi(points, Ω, T);
-
-# points .= pcopy
-# @profview voronoi = minimum_variance_voronoi(points, Ω, T);
-
-# points .= pcopy
-# @profview_allocs voronoi = minimum_variance_voronoi(points, Ω, T) sample_rate=0.001
-
-# voronoi.vertices .-= 0.5
-# voronoi.cell_centers .-= 0.5
 
 # viz(voronoi, cell_colors=vec(cell_averages(voronoi, T)))
 # volume!(sdf, algorithm=:iso, isovalue=0, isorange=0.1, alpha=0.1)
-
 
 
 color_voronoi!(domain, points)
@@ -78,12 +64,12 @@ display(fig)
 
 Tarr2 = copy(Tarr)
 cell_vals = copy(volumes)
-OptimalVoronoi.cell_averages!(cell_vals, volumes, domain, T)
-OptimalVoronoi.paint!(Tarr2, domain, cell_vals)
+cell_averages!(cell_vals, volumes, domain, T)
+paint!(Tarr2, domain, cell_vals)
 
-volume(Tarr, colormap=colormap, colorrange=(0.98,  maximum(Tarr)))
+volume(Tarr, colormap=colormap, colorrange=(0.98, maximum(Tarr)))
 volume(Tarr2, colormap=colormap, colorrange=(0.98, maximum(Tarr)))
-# scatter!(points, label=nothing)
+scatter!(points, label=nothing)
 
 
 # viz(voronoi, cell_colors=vec(complex_volumes(voronoi)))

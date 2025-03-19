@@ -55,32 +55,28 @@ end
 
 function voronoi_kernel!(domain::CuDeviceArray{T1,D,M}, points::CuDeviceMatrix{T2,M}, cidx::CartesianIndices) where {T1,T2,D,M}
     i = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
-    if i > length(domain)
+    # Don't bother evaluating if the cell is out of bounds
+    if i > length(domain) || domain[i] == 0
         return nothing
     end
+
     N = size(points, 2)
 
-    index = cidx[i]
+    @inbounds index = cidx[i]
     min_dist = typemax(T2)
 
     for p in 1:N
-        # Don't bother evaluating if the cell is out of bounds
-        if domain[index] == 0
-            continue
-        end
-
-        old_dist = min_dist
         new_dist = zero(T2)
 
         # Compute squared distance to point p
         for d in 1:D
-            new_dist += (index[d] - points[d, p])^2
+            @inbounds new_dist += (index[d] - points[d, p])^2
         end
 
         # Update if closer distance discovered
-        if new_dist < old_dist
+        if new_dist < min_dist
             min_dist = new_dist
-            domain[index] = p
+            @inbounds domain[index] = p
         end
     end
 

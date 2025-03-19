@@ -24,31 +24,76 @@ end
 
 function cell_volume_integral_kernel(integrals::CuDeviceMatrix{T1,M}, f::F, domain::CuDeviceArray{T2,3,M}, cidxs::CartesianIndices) where {F,T1,T2,M}
     lidx = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
-    if lidx > length(domain)
+    if lidx > length(domain) || @inbounds domain[lidx] == 0
         return nothing
     end
 
     D = size(integrals, 1)
 
-    cidx = cidxs[lidx]
-
-    i = domain[cidx]
-    if i == 0
-        return nothing
-    end
+    @inbounds cidx = cidxs[lidx]
+    @inbounds i = domain[cidx]
 
     x, y, z = cidx[1], cidx[2], cidx[3]
     p = SVector{3}(x, y, z)
     r = f(p, i)
-    @assert length(r) == D
 
     for d in 1:D
-        CUDA.@atomic integrals[d, i] += r[d]
+        @inbounds CUDA.@atomic integrals[d, i] += r[d]
     end
 
     return nothing
 end
 
+
+function integrate_face_pair(i, j, f::F, domain::AbstractArray{T3,3}, points::AbstractMatrix{T1}) where {F,T1,T3}
+    integral = zero(T1)
+    e_z = SVector{3,T1}(0.0, 0.0, 1.0)
+
+    @inbounds p_i = SVector{3,T1}(points[1, i], points[2, i], points[3, i])
+    @inbounds p_j = SVector{3,T1}(points[1, j], points[2, j], points[3, j])
+
+    p_mid = (p_i + p_j) / 2
+    n = (p_j - p_i) / norm(p_j - p_i)
+
+    # First in-plane basis vector
+    u_1 = n × e_z
+    u_1 /= norm(u_1)
+
+    # Second in-plane basis vector
+    u_2 = n × u_1
+
+    # Rotation matrix
+    R = hcat(n, u_1, u_2)
+
+    # Sweep outwards in polar coordinates until a circle is fully beyond the face
+    # (Beyond can be either in a third cell, or beyond the domain of integration)
+    dr = T1(0.1)
+    for r in dr:dr:T1(100.0)
+        any_valid = false
+        dθ = T1(min((2π / 10.0) / r / dr, 2π / 10.0))
+
+        for θ in T1(0.0):dθ:T1(2π)
+            p_original = SVector{3,T1}(0.0, r * cos(θ), r * sin(θ))
+            p_plane = R * p_original + p_mid
+
+            # Check if point is within the face (is within the domain and is part of the boundary between cells i and j)
+            @inbounds cidx = CartesianIndex(round(Int, p_plane[1]), round(Int, p_plane[2]), round(Int, p_plane[3]))
+            if !checkbounds(Bool, domain, cidx) || domain[cidx] == 0 || (domain[cidx] != i && domain[cidx] != j)
+                continue
+            end
+
+            any_valid = true
+            integral += f(p_plane, i, j) * r * dr * dθ
+        end
+
+        # If none of the points in this radius were valid, we're done by assumption of convexity
+        if !any_valid
+            break
+        end
+    end
+
+    return integral
+end
 
 """
     `integrals` must already encode adjacency in its sparsity pattern
@@ -57,53 +102,13 @@ function neighbor_surface_integrals!(integrals::AbstractSparseMatrix{T1,T2}, f::
     Ncells, _ = size(integrals)
     integral_vals = nonzeros(integrals)
     rvs = rowvals(integrals)
-    e_z = SVector{3,T1}(0.0, 0.0, 1.0)
 
-    for i in 1:Ncells
-        p_i = SVector{3,T1}(points[1, i], points[2, i], points[3, i])
+    for j in 1:Ncells
 
-        for idx in nzrange(integrals, i)
-            j = rvs[idx]
-            p_j = SVector{3,T1}(points[1, j], points[2, j], points[3, j])
-            p_mid = (p_i + p_j) / 2
-            n = (p_j - p_i) / norm(p_j - p_i)
+        for idx in nzrange(integrals, j)
+            i = rvs[idx]
 
-            # First in-plane basis vector
-            u_1 = n × e_z
-            u_1 /= norm(u_1)
-
-            # Second in-plane basis vector
-            u_2 = n × u_1
-
-            # Rotation matrix
-            R = hcat(n, u_1, u_2)
-
-            # Sweep outwards in polar coordinates until a circle is fully beyond the face
-            # (Beyond can be either in a third cell, or beyond the domain of integration)
-            dr = 0.1
-            for r in dr:dr:100.0
-                any_valid = false
-                dθ = min((2π / 10.0) / r / dr, 2π / 10.0)
-
-                for θ in 0.0:dθ:2π
-                    p_original = SVector{3,T1}(0.0, r * cos(θ), r * sin(θ))
-                    p_plane = R * p_original + p_mid
-
-                    # Check if point is within the face (is within the domain and is part of the boundary between cells i and j)
-                    cidx = CartesianIndex(round(Int, p_plane[1]), round(Int, p_plane[2]), round(Int, p_plane[3]))
-                    if !checkbounds(Bool, domain, cidx) || domain[cidx] == 0 || (domain[cidx] != i && domain[cidx] != j)
-                        continue
-                    end
-
-                    any_valid = true
-                    integral_vals[idx] += f(p_plane, i, j) * r * dr * dθ
-                end
-
-                # If none of the points in this radius were valid, we're done by assumption of convexity
-                if !any_valid
-                    break
-                end
-            end
+            integral_vals[idx] = integrate_face_pair(i, j, f, domain, points)
         end
     end
 end
@@ -123,61 +128,38 @@ end
 function neighbor_surface_integral_kernel(integrals::CUSPARSE.CuSparseDeviceMatrixCSC{T1,T2}, f::F, domain::CuDeviceArray{T3,3,M}, points::CuDeviceMatrix{T1,M}) where {F,T1,T2,T3,M}
     x = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
     y = (blockIdx().y - Int32(1)) * blockDim().y + threadIdx().y
-    e_z = SVector{3,T1}(0.0, 0.0, 1.0)
 
-    i = x
-    if i > size(points, 2) || (integrals.colPtr[i+1] - integrals.colPtr[i]) < y
+    j = x
+    if j > size(points, 2) || (@inbounds(integrals.colPtr[j+1] - integrals.colPtr[j])) < y
         return nothing
     end
 
-    idx = (integrals.colPtr[i]:(integrals.colPtr[i+1]-1))[y]
-    j = integrals.rowVal[idx]
+    @inbounds idx = integrals.colPtr[j] + y - 1
+    @inbounds i = integrals.rowVal[idx]
 
-    p_i = SVector{3,T1}(points[1, i], points[2, i], points[3, i])
-    p_j = SVector{3,T1}(points[1, j], points[2, j], points[3, j])
+    @inbounds integrals.nzVal[idx] = integrate_face_pair(i, j, f, domain, points)
 
-    p_mid = (p_i + p_j) / 2
-    n = (p_j - p_i) / norm(p_j - p_i)
+    return nothing
+end
 
-    # First in-plane basis vector
-    u_1 = n × e_z
-    # @cuprintln(norm(u_1))
-    u_1 /= norm(u_1)
+function neighbor_surface_integrals!(integrals::CuMatrix{T1,M}, f::F, domain::CuArray{T3,3,M}, points::CuMatrix{T1,M}) where {F,T1,T3,M}
+    nthreads_x = 16
+    nthreads_y = 16
+    nblocks_x = ceil(Int, size(integrals, 1) / nthreads_x)
+    nblocks_y = ceil(Int, size(integrals, 2) / nthreads_y)
 
-    # Second in-plane basis vector
-    u_2 = n × u_1
+    @cuda threads = (nthreads_x, nthreads_y) blocks = (nblocks_x, nblocks_y) neighbor_surface_integral_kernel(integrals, f, domain, points)
+end
 
-    # Rotation matrix
-    R = hcat(n, u_1, u_2)
+function neighbor_surface_integral_kernel(integrals::CuDeviceMatrix{T1,M}, f::F, domain::CuDeviceArray{T3,3,M}, points::CuDeviceMatrix{T1,M}) where {F,T1,T3,M}
+    i = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
+    j = (blockIdx().y - Int32(1)) * blockDim().y + threadIdx().y
 
-    # Sweep outwards in polar coordinates until a circle is fully beyond the face
-    # (Beyond can be either in a third cell, or beyond the domain of integration)
-    dr = 0.1
-    for r in dr:dr:100.0
-        any_valid = false
-        dθ = min((2π / 10.0) / r / dr, 2π / 10.0)
-
-        for θ in 0.0:dθ:2π
-            p_original = SVector{3,T1}(0.0, r * cos(θ), r * sin(θ))
-            p_plane = R * p_original + p_mid
-
-            # Check if point is within the face (is within the domain and is part of the boundary between cells i and j)
-            cidx = CartesianIndex(round(Int32, p_plane[1]), round(Int32, p_plane[2]), round(Int32, p_plane[3]))
-
-            if !checkbounds(Bool, domain, cidx) || domain[cidx] == 0 || (domain[cidx] != i && domain[cidx] != j)
-                continue
-            end
-
-            any_valid = true
-            val = f(p_plane, i, j) * r * dr * dθ
-            CUDA.@atomic integrals.nzVal[idx] += val
-        end
-
-        # If none of the points in this radius were valid, we're done by assumption of convexity
-        if !any_valid
-            break
-        end
+    if i > size(integrals, 1) || j > size(integrals, 2) || integrals[i, j] == 0
+        return nothing
     end
+
+    @inbounds integrals[i, j] = integrate_face_pair(i, j, f, domain, points)
 
     return nothing
 end

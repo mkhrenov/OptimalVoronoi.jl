@@ -26,8 +26,8 @@ domain = map(x -> x ≤ 0.0 ? 1 : 0, sdf)
 # Move data to GPU
 domain = cu(domain)
 points = cu(points)
-A = CUDA.zeros(Int, N_cells, N_cells)
-e = CUDA.zeros(Int, N_cells)
+A = CUDA.zeros(N_cells, N_cells)
+e = CUDA.zeros(N_cells)
 
 CUDA.@time color_voronoi!(domain, points)
 CUDA.@time adjacency_matrix_vector!(A, e, domain)

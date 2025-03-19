@@ -26,7 +26,7 @@ end
 function eval_minvar_vox_gradient!(g, x, domain, A, e, u::G, ū, volumes) where {G}
     gm = reshape(g, 3, :)
     points = reshape(x, 3, :)
-    color_voronoi!(domain, points)
+    # color_voronoi!(domain, points)
     cell_averages!(ū, volumes, domain, u)
 
     cumulative_squared_distance_vox_gradient!(gm, points, domain)
@@ -53,7 +53,7 @@ function cell_averages!(ū, volumes, domain, u::G) where {G}
 end
 
 function cumulative_variance_vox(domain, sqerr, u::G, ū) where {G}
-    g(p, i) = (u(p) - ū[i])^2
+    g(p, i) = @inbounds (u(p) - ū[i])^2
 
     sqerr .= 0
     cell_volume_integrals!(sqerr, g, domain)
@@ -62,23 +62,22 @@ function cumulative_variance_vox(domain, sqerr, u::G, ū) where {G}
 end
 
 function variance_vox_gradient!(gm, domain, points, u::G, ū, A, e) where {G}
-    gx(p, i, j) = (ū[i]^2 - ū[j]^2 + 2(ū[j] - ū[i]) * u(p)) * (p[1] - points[1, i]) / sqrt((points[1, i] - points[1, j])^2 + (points[2, i] - points[2, j])^2 + (points[3, i] - points[3, j])^2)
-    gy(p, i, j) = (ū[i]^2 - ū[j]^2 + 2(ū[j] - ū[i]) * u(p)) * (p[2] - points[2, i]) / sqrt((points[1, i] - points[1, j])^2 + (points[2, i] - points[2, j])^2 + (points[3, i] - points[3, j])^2)
-    gz(p, i, j) = (ū[i]^2 - ū[j]^2 + 2(ū[j] - ū[i]) * u(p)) * (p[3] - points[3, i]) / sqrt((points[1, i] - points[1, j])^2 + (points[2, i] - points[2, j])^2 + (points[3, i] - points[3, j])^2)
+    gx(p, i, j) = @inbounds (ū[i]^2 - ū[j]^2 + 2(ū[j] - ū[i]) * u(p)) * (p[1] - points[1, i]) / sqrt((points[1, i] - points[1, j])^2 + (points[2, i] - points[2, j])^2 + (points[3, i] - points[3, j])^2)
+    gy(p, i, j) = @inbounds (ū[i]^2 - ū[j]^2 + 2(ū[j] - ū[i]) * u(p)) * (p[2] - points[2, i]) / sqrt((points[1, i] - points[1, j])^2 + (points[2, i] - points[2, j])^2 + (points[3, i] - points[3, j])^2)
+    gz(p, i, j) = @inbounds (ū[i]^2 - ū[j]^2 + 2(ū[j] - ū[i]) * u(p)) * (p[3] - points[3, i]) / sqrt((points[1, i] - points[1, j])^2 + (points[2, i] - points[2, j])^2 + (points[3, i] - points[3, j])^2)
 
     adjacency_matrix_vector!(A, e, domain)
     areas = sparse(Float32.(A))
-    # o = CUDA.ones(size(areas, 2))
 
-    nonzeros(areas) .= 0.0
+    nonzeros(areas) .= 0
     neighbor_surface_integrals!(areas, gx, domain, points)
-    view(gm, 1, :) .+= vec(sum(areas, dims=1))
+    view(gm, 1, :) .+= vec(sum(areas, dims=2))
 
-    nonzeros(areas) .= 0.0
+    nonzeros(areas) .= 0
     neighbor_surface_integrals!(areas, gy, domain, points)
-    view(gm, 2, :) .+= vec(sum(areas, dims=1))
+    view(gm, 2, :) .+= vec(sum(areas, dims=2))
 
-    nonzeros(areas) .= 0.0
+    nonzeros(areas) .= 0
     neighbor_surface_integrals!(areas, gz, domain, points)
-    view(gm, 3, :) .+= vec(sum(areas, dims=1))
+    view(gm, 3, :) .+= vec(sum(areas, dims=2))
 end

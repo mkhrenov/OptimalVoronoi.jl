@@ -24,13 +24,13 @@ end
 function eval_cvt_vox_objective_gradient!(g, x, domain)
     points = reshape(x, 3, :)
     grad_p = reshape(g, 3, :)
-    color_voronoi!(domain, points)
+    # color_voronoi!(domain, points)
 
     cumulative_squared_distance_vox_gradient!(grad_p, points, domain)
 end
 
 function cumulative_squared_distance_vox(points, domain, sqdist)
-    g(p, i) = (p[1] - points[1, i])^2 + (p[2] - points[2, i])^2 + (p[3] - points[3, i])^2
+    g(p, i) = @inbounds (p[1] - points[1, i])^2 + (p[2] - points[2, i])^2 + (p[3] - points[3, i])^2
     sqdist .= 0
     cell_volume_integrals!(sqdist, g, domain)
 
