@@ -67,10 +67,7 @@ cell_vals = copy(volumes)
 cell_averages!(cell_vals, volumes, domain, T)
 paint!(Tarr2, domain, cell_vals)
 
-volume(Tarr, colormap=colormap, colorrange=(0.98, maximum(Tarr)))
-volume(Tarr2, colormap=colormap, colorrange=(0.98, maximum(Tarr)))
+fig = Figure()
+volume!(Axis(f[1, 2]), Tarr, colormap=colormap, colorrange=(0.98, maximum(Tarr)))
+volume!(Axis(f[1, 2]), Tarr2, colormap=colormap, colorrange=(0.98, maximum(Tarr)))
 scatter!(points, label=nothing)
-
-
-# viz(voronoi, cell_colors=vec(complex_volumes(voronoi)))
-# volume!(sdf, algorithm=:iso, isovalue=0, isorange=0.1, alpha=0.1)

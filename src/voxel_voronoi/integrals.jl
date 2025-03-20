@@ -137,7 +137,7 @@ function neighbor_surface_integral_kernel(integrals::CUSPARSE.CuSparseDeviceMatr
     @inbounds idx = integrals.colPtr[j] + y - 1
     @inbounds i = integrals.rowVal[idx]
 
-    @inbounds integrals.nzVal[idx] = integrate_face_pair(i, j, f, domain, points)
+    integrals.nzVal[idx] = integrate_face_pair(i, j, f, domain, points)
 
     return nothing
 end
@@ -159,7 +159,7 @@ function neighbor_surface_integral_kernel(integrals::CuDeviceMatrix{T1,M}, f::F,
         return nothing
     end
 
-    @inbounds integrals[i, j] = integrate_face_pair(i, j, f, domain, points)
+    integrals[i, j] = integrate_face_pair(i, j, f, domain, points)
 
     return nothing
 end
@@ -168,6 +168,37 @@ end
 """
     Ray-cast
 """
-function exterior_surface_integrals()
+function integrate_exposed_surface(i, f::F, Ω::G, domain::AbstractArray{T3,3}, points::AbstractMatrix{T1}) where {F,G,T1,T3}
+    p_i = SVector{3}(points[1, i], points[2, i], points[3, i])
+    integral = zero(T1)
 
+    dθ = π / 36
+    dϕ = 2π / 72
+
+    for ϕ in 0:dϕ:2π
+        for θ in 0:dθ:π
+            n = SVector{3}(sin(θ) * cos(ϕ), sin(θ) * sin(ϕ), cos(θ))
+            p_r = intersect_sdf(p_i, n, Ω)
+            r = norm(p_r - p_i)
+
+            p_d = p_r - n
+            @inbounds cx = round(Int, p_d[1])
+            @inbounds cy = round(Int, p_d[2])
+            @inbounds cz = round(Int, p_d[3])
+            cidx = CartesianIndex(cx, cy, cz)
+            if !checkbounds(Bool, domain, cidx) || domain[cidx] != i# && domain[cx, cy, cz] != i) # should really check if any neighbors are i
+                continue
+            end
+
+            integral += f(p_r) * r^2 * sin(θ) * dθ * dϕ
+        end
+    end
+
+    return integral
+end
+
+function exterior_surface_integrals!(integrals::AbstractVector{T1}, f::F, Ω::G, domain::AbstractArray{T3,3}, points::AbstractMatrix{T1}) where {F,G,T1,T3}
+    map!(
+        (i) -> integrate_exposed_surface(i, f, Ω, domain, points),
+        integrals, 1:size(points, 2))
 end
